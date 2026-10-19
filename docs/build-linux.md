@@ -83,3 +83,9 @@ Tag, beispielsweise `v0.3.1`, pushen. Erst nach beiden nativen Builds, Tests und
 der Sammlung der Drittanbieterquellen veröffentlicht der Workflow die App-Pakete,
 Anwendungs- und Abhängigkeitsquellen sowie `SHA256SUMS`. Weitere Hinweise zur
 Quellbereitstellung stehen in [distribution.md](distribution.md).
+
+Falls nur die Veröffentlichung fehlschlägt, während beide nativen Builds und
+der Quellenjob bereits erfolgreich waren, kann **Publish verified release**
+die vorhandenen Artefakte veröffentlichen. Dafür den ursprünglichen Tag und
+die Nummer des Release-Laufs angeben. Der Workflow prüft deren Zuordnung und
+die erfolgreichen Jobs erneut; der Tag wird dabei nicht verändert.

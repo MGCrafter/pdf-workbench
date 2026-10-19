@@ -164,7 +164,10 @@ jobs:
               if path.parent != root or not path.is_file() or path.stat().st_size != item['size']:
                   raise SystemExit('Missing or incomplete corresponding source asset')
               with path.open('rb') as stream:
-                  if hashlib.file_digest(stream, 'sha256').hexdigest() != item['sha256']:
+                  digest = hashlib.sha256()
+                  while chunk := stream.read(1024 * 1024):
+                      digest.update(chunk)
+                  if digest.hexdigest() != item['sha256']:
                       raise SystemExit('Source asset checksum mismatch')
           PY
           cd release-assets
