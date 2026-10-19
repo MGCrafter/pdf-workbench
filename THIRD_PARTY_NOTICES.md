@@ -28,6 +28,10 @@ audited Qt 6.11.2 core, GUI, PDF and plugin modules; and CPython's complete
 license appendix and OpenSSL license for the actual interpreter version.
 Ubuntu builds also include installed native-package copyright files and a
 versioned package inventory, deliberately covering a superset of the runtime.
+The installed Python runtime's own license/notice files are retained unchanged
+under `python/installed-runtime/`; these include Microsoft's Distributable Code
+terms when supplied by the Windows interpreter distributor. Such terms apply
+to those Microsoft DLLs, separately from the GPL application source.
 
 The QtPdf texts cover all nine components listed by Qt: Abseil, FreeType,
 PDFium, Chromium, fast_float, ICU, libjpeg-turbo, libpng and zlib. They include

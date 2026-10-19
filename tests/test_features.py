@@ -40,7 +40,8 @@ class SelectionTests(unittest.TestCase):
 class FeatureTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
-        self.directory = Path(self.temporary.name)
+        # Windows may expose the same temporary directory through an 8.3 alias.
+        self.directory = Path(self.temporary.name).resolve()
         self.source_path = self.directory / "quelle.pdf"
         raw = io.BytesIO()
         document = canvas.Canvas(raw, pagesize=(300, 500))

@@ -28,6 +28,11 @@ LOCK = ROOT / "packaging/notices-lock.json"
 # This release does not include WebEngine, Multimedia, Bluetooth or Qt3D.
 # New native Qt modules require an attribution/source audit before this list grows.
 COVERED_QT_MODULES = frozenset("Core Gui Widgets Network DBus Pdf PdfWidgets Svg SvgWidgets OpenGL OpenGLWidgets PrintSupport Sql Xml Concurrent Qml QmlMeta QmlModels QmlWorkerScript QmlBuiltins Quick QuickControls2 QuickTemplates2 QuickWidgets ShaderTools VirtualKeyboard WaylandClient WaylandCompositor WaylandEglClientHwIntegration WaylandEglCompositorHwIntegration InputSupport XcbQpa EglFSDeviceIntegration".split())
+# These are named internal QtBase modules in v6.11.2, not new third-party
+# runtimes. CMake definitions and LGPL source headers are linked in
+# docs/distribution.md. Their libdrm/GBM/Wayland dependencies still go through
+# the separate exact-version Ubuntu native-source audit.
+COVERED_QT_MODULES |= frozenset(("EglFsKmsGbmSupport", "EglFsKmsSupport", "WlShellIntegration"))
 
 
 class IncompleteNotices(RuntimeError):
@@ -166,9 +171,33 @@ def collect_python(output: Path, version: str) -> None:
     openssl = match[1]
     url = f"https://raw.githubusercontent.com/openssl/openssl/openssl-{openssl}/LICENSE.txt"
     put(output, "python/OpenSSL-LICENSE.txt", fetch(url))
+    runtime_licenses = collect_python_runtime_notices(output)
     put(output, "python/runtime.json", (json.dumps({"python": version, "openssl": ssl.OPENSSL_VERSION,
         "python_source": f"https://www.python.org/ftp/python/{version}/Python-{version}.tar.xz",
-        "openssl_license_source": url}, indent=2) + "\n").encode())
+        "openssl_license_source": url, "installed_runtime_licenses": runtime_licenses}, indent=2) + "\n").encode())
+
+
+def collect_python_runtime_notices(output: Path) -> list[dict]:
+    """Retain distributor-added runtime terms, notably Microsoft's Windows text."""
+    locations = (("base-prefix", Path(sys.base_prefix)), ("prefix", Path(sys.prefix)),
+                 ("stdlib", Path(sysconfig.get_path("stdlib"))))
+    copied, seen = [], set()
+    for label, directory in locations:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.iterdir()):
+            if not path.is_file() or not path.name.lower().startswith(("license", "licence", "copying", "notice")):
+                continue
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            if path.stat().st_size > 4 * 1024 * 1024:
+                raise IncompleteNotices("Installed Python runtime license is unexpectedly large")
+            relative = f"python/installed-runtime/{label}-{path.name}"
+            put(output, relative, path.read_bytes())
+            copied.append({"file": relative, "source_location": f"{label}/{path.name}", "sha256": sha256(path)})
+    return copied
 
 
 def collect_system_notices(output: Path) -> None:

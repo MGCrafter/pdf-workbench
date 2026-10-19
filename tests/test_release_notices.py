@@ -64,9 +64,11 @@ class ReleaseNoticeTests(unittest.TestCase):
         output, bundle = self.directory / "notices", self.directory / "bundle"
         output.mkdir(); bundle.mkdir()
         (output / "manifest.json").write_text(json.dumps({"schema_version": 1, "complete": True, "native_source_audit_complete": True, "files": {}}))
-        for module in ("Core", "Gui", "Widgets", "Pdf"):
+        for module in ("Core", "Gui", "Widgets", "Pdf", "EglFsKmsGbmSupport", "EglFsKmsSupport", "WlShellIntegration"):
             (bundle / f"Qt6{module}.dll").write_bytes(b"fixture")
-        self.assertTrue(notices.verify_bundle(bundle, output)["verified"])
+        result = notices.verify_bundle(bundle, output)
+        self.assertTrue(result["verified"])
+        self.assertTrue({"EglFsKmsGbmSupport", "EglFsKmsSupport", "WlShellIntegration"} <= set(result['qt_modules']))
         (bundle / "Qt6Multimedia.dll").write_bytes(b"unaudited")
         with self.assertRaisesRegex(notices.IncompleteNotices, "new attribution"):
             notices.verify_bundle(bundle, output)
@@ -143,9 +145,10 @@ class ReleaseNoticeTests(unittest.TestCase):
             if '-S' in command:
                 return SimpleNamespace(returncode=0, stdout='libdemo1:amd64: '+str(library)+'\n')
             return SimpleNamespace(returncode=0, stdout='demo\t1:1.2-0ubuntu1')
-        with patch.object(notices.sys, 'platform', 'linux'), patch.object(notices.shutil, 'which', return_value='/usr/bin/dpkg-query'), patch.object(notices.subprocess, 'run', side_effect=query):
+        with patch.object(notices.sys, 'platform', 'linux'), patch.object(notices.shutil, 'which', return_value='/usr/bin/dpkg-query'), patch.object(notices.subprocess, 'run', side_effect=query), patch.object(notices.platform, 'platform', return_value='Linux-release-test-x86_64'):
             result = notices.native_source_inventory(toc)
         self.assertEqual(len(result['packages']), 1)
+        self.assertEqual(result['builder_platform'], 'Linux-release-test-x86_64')
         self.assertEqual(result['packages'][0]['source_version'], '1:1.2-0ubuntu1')
         self.assertEqual(result['packages'][0]['binary_paths'], [str(library)])
 
@@ -164,6 +167,19 @@ class ReleaseNoticeTests(unittest.TestCase):
         (output / 'manifest.json').write_text(json.dumps({'schema_version': 1, 'complete': True, 'files': {}}))
         with patch.object(notices.sys, 'platform', 'linux'), self.assertRaisesRegex(notices.IncompleteNotices, 'has not completed'):
             notices.verify_bundle(self.directory / 'bundle', output)
+
+    def test_installed_python_runtime_license_preserves_distributor_terms_byte_for_byte(self):
+        prefix, stdlib, output = self.directory / 'python-runtime', self.directory / 'python-runtime/Lib', self.directory / 'notices'
+        stdlib.mkdir(parents=True)
+        license_bytes = b'Python runtime license\r\nMicrosoft Distributable Code terms\r\n'
+        (prefix / 'LICENSE.txt').write_bytes(license_bytes)
+        (stdlib / 'NOTICE.vendor').write_bytes(b'Additional runtime distributor notice')
+        with patch.object(notices.sys, 'base_prefix', str(prefix)), patch.object(notices.sys, 'prefix', str(prefix)), patch.object(notices.sysconfig, 'get_path', return_value=str(stdlib)):
+            records = notices.collect_python_runtime_notices(output)
+        self.assertEqual(len(records), 2)
+        actual = output / 'python/installed-runtime/base-prefix-LICENSE.txt'
+        self.assertEqual(actual.read_bytes(), license_bytes)
+        self.assertEqual(next(r['sha256'] for r in records if r['file'].endswith('LICENSE.txt')), hashlib.sha256(license_bytes).hexdigest())
 
 
 if __name__ == "__main__":

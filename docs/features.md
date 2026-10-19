@@ -1,4 +1,4 @@
-# Zusätzliche Seitenfunktionen in 0.2
+# Seitenauswahl und Export
 
 **Duplizieren:** Jede ausgewählte Arbeitsseite erhält eine eigene neue ID. Ihre
 Kopie folgt unmittelbar auf das Original und übernimmt Quellseite und zusätzliche
@@ -29,7 +29,7 @@ Verbleib der bereits erzeugten Dateien ausdrücklich als unbekannt mit den
 zuletzt bekannten Pfaden angegeben; der Ersatzordner wird nicht bereinigt.
 
 Die bestehenden Grenzen gelten weiter: verschlüsselte PDFs, Formulare und
-Signaturen werden abgewiesen. Dokumentweite Lesezeichen, Anhänge, PDF/A-Konformität
+digitale Zertifikatssignaturen werden abgewiesen. Dokumentweite Lesezeichen, Anhänge, PDF/A-Konformität
 und interne Verweise über neu zusammengesetzte oder getrennte Seiten werden nicht
 als vollständig erhalten zugesagt. Seiten mit nichtpositiven oder nichtendlichen
 MediaBox-Abmessungen werden vor dem Import abgewiesen; normale abweichende

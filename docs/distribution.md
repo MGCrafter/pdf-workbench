@@ -91,6 +91,26 @@ Unknown Qt modules fail the audit. Adding QtWebEngine, Multimedia, FFmpeg or
 other unaudited modules requires reviewing their additional notices and source
 obligations. Keep collected notices in the binary's `licenses` directory.
 
+Three additional internal libraries are explicitly mapped to the supplied
+QtBase 6.11.2 source: `EglFsKmsSupport` and `EglFsKmsGbmSupport` are the
+EGLFS/KMS device-integration helpers, and `WlShellIntegration` is the Wayland
+client shell helper. Their exact [KMS support CMake definition](https://github.com/qt/qtbase/blob/v6.11.2/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms_support/CMakeLists.txt),
+[GBM helper definition](https://github.com/qt/qtbase/blob/v6.11.2/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms/CMakeLists.txt)
+and [Wayland shell definition](https://github.com/qt/qtbase/blob/v6.11.2/src/plugins/platforms/wayland/plugins/shellintegration/wl-shell/CMakeLists.txt)
+declare internal Qt modules. Their source headers offer LGPL-3.0/GPL terms
+already included in the corpus. The shell helper's attribution points to
+Wayland protocol 1.24.0, whose full MIT copyright/notice is already retained as
+`qtwaylandcompositor-attribution-wayland-protocol.txt`. Its use by the platform
+plugin is explicit in [QtBase's versioned attribution metadata](https://github.com/qt/qtbase/blob/v6.11.2/src/3rdparty/wayland/protocols/wayland/qt_attribution.json).
+External libdrm, GBM and Wayland shared libraries remain subject to the native
+package/source audit; this mapping does not exempt them.
+
+The collector also retains actual installed Python runtime `LICENSE*`,
+`COPYING*` and `NOTICE*` files from its installation prefix and standard-library
+directory, in addition to upstream source notices. On Windows this preserves
+the distributor-added Microsoft Distributable Code terms. Those terms apply
+to the Microsoft runtime DLLs; they do not change the application source license.
+
 ## Rebuilding and substituting Qt
 
 Application build instructions are the workflow and `packaging/build.py`;
