@@ -138,3 +138,12 @@ Primary sources: [QtPdf licensing](https://doc.qt.io/qt-6.11/qtpdf-licensing.htm
 [Qt source archive and metadata](https://download.qt.io/official_releases/qt/6.11/6.11.2/single/),
 [PyQt-builder bundling documentation](https://pyqt-builder.readthedocs.io/en/stable/pyqtbundle.html),
 [GPLv3 section 6](https://www.gnu.org/licenses/gpl-3.0.html#section6).
+
+## Dateinamen der Quellarchive
+
+GitHub verändert bestimmte Sonderzeichen in Downloadnamen.
+`source-manifest.json` nennt den tatsächlichen Downloadnamen unter `filename`
+und bei einer Umbenennung den ursprünglichen Namen unter `upstream_filename`.
+Inhalt und SHA-256 bleiben unverändert. Vor `dpkg-source -x` die betreffenden
+Ubuntu-Quellarchive wieder unter ihrem ursprünglichen Namen ablegen, damit
+die Dateiverweise in der unveränderten `.dsc` passen.

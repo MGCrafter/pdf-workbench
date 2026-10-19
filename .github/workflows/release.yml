@@ -153,13 +153,34 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import hashlib, json, os, pathlib
+          import hashlib, json, os, pathlib, re
           root = pathlib.Path('release-assets')
           tag = os.environ['GITHUB_REF_NAME']
           for suffix in ('windows-x86_64.zip', 'linux-x86_64.tar.gz', 'source.tar.gz'):
               if not (root / f'PDFWorkbench-{tag}-{suffix}').is_file():
                   raise SystemExit('Missing release asset: ' + suffix)
-          for item in json.loads((root / 'source-manifest.json').read_text()):
+          manifest_path = root / 'source-manifest.json'
+          sources = json.loads(manifest_path.read_text())
+          renames = []
+          destinations = set()
+          for item in sources:
+              filename = item['filename']
+              path = root / filename
+              if path.parent != root or not path.is_file():
+                  raise SystemExit('Missing or unsafe corresponding source asset')
+              normalized = re.sub(r'[^A-Za-z0-9._-]', '.', filename).strip('.')
+              target = root / normalized
+              if not normalized or normalized in destinations or (normalized != filename and os.path.lexists(target)):
+                  raise SystemExit('Release source filename normalization collision')
+              destinations.add(normalized)
+              renames.append((item, path, target))
+          for item, path, target in renames:
+              if path != target:
+                  os.link(path, target)
+                  path.unlink()
+                  item.setdefault('upstream_filename', item['filename'])
+                  item['filename'] = target.name
+          for item in sources:
               path = root / item['filename']
               if path.parent != root or not path.is_file() or path.stat().st_size != item['size']:
                   raise SystemExit('Missing or incomplete corresponding source asset')
@@ -169,6 +190,7 @@ jobs:
                       digest.update(chunk)
                   if digest.hexdigest() != item['sha256']:
                       raise SystemExit('Source asset checksum mismatch')
+          manifest_path.write_text(json.dumps(sources, indent=2) + '\n', encoding='utf-8')
           PY
           cd release-assets
           sha256sum * > SHA256SUMS
