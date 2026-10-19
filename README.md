@@ -8,8 +8,6 @@ lokal, ohne Konto und ohne Upload deiner Dokumente.
 
 ## Download
 
-Die Downloadpakete für den ersten Release sind noch in Vorbereitung.
-
 | System | Download für v0.3.0 |
 | --- | --- |
 | Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.3.0/PDFWorkbench-v0.3.0-windows-x86_64.zip) |
