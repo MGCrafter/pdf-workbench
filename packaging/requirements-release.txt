@@ -1,0 +1,9 @@
+# Same app libraries on both release builders. Update with a tested release.
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.2
+PyQt6-sip==13.12.0
+pypdf==6.10.0
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+reportlab==5.0.1
+Pillow==12.3.0

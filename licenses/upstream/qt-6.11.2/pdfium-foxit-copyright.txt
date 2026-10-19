@@ -1,0 +1,8 @@
+Source: https://raw.githubusercontent.com/qt/qtwebengine-chromium/5170777d28bee1ce92cc693a0dbf2ad01492e5cf/chromium/third_party/pdfium/core/fxge/fontdata/chromefontdata/FoxitSans.cpp
+Copyright and governing-license header (implementation/font data omitted):
+
+// Copyright 2014 The PDFium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Original code copyright 2014 Foxit Software Inc. http://www.foxitsoftware.com

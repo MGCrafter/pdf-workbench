@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png binary
+
+# Keep upstream legal texts byte-for-byte, including original whitespace.
+licenses/upstream/** -text -whitespace
+licenses/pypdf-LICENSE -text -whitespace

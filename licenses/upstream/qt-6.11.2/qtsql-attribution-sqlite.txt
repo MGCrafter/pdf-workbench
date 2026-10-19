@@ -1,0 +1,26 @@
+Source: https://doc.qt.io/qt-6.11/qtsql-attribution-sqlite.html
+Qt release: 6.11.2
+
+SQLite is a small C library that implements a self-contained, embeddable, zero-configuration SQL database engine.
+
+
+Used in Qt SQL Lite plugin. Configure Qt with -system-sqlite or -no-sqlite to avoid.
+
+
+The sources can be found in qtbase/src/3rdparty/sqlite.
+
+
+Project Homepage, upstream version: 3.53.4
+
+
+The authors disclaim copyright to the source code. However, a license can be obtained if needed.
+
+
+SQLite Blessing.
+
+
+The author disclaims copyright to this source code. In place of a legal notice, here is a blessing:
+
+May you do good and not evil.
+May you find forgiveness for yourself and forgive others.
+May you share freely, never taking more than you give.

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-workbench"
+version = "0.3.0"
+description = "Free, local PDF page organizer for Linux, Windows and macOS"
+authors = [{name = "xJessyX"}]
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "licenses/*"]
+dependencies = ["PyQt6>=6.8,<7", "pypdf>=6.10,<7"]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6,<7"]
+test = ["reportlab>=4", "Pillow>=11"]
+
+[project.urls]
+Repository = "https://github.com/MGCrafter/pdf-workbench"
+Issues = "https://github.com/MGCrafter/pdf-workbench/issues"
+Releases = "https://github.com/MGCrafter/pdf-workbench/releases"
+
+[project.gui-scripts]
+pdf-workbench = "pdf_workbench.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

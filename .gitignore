@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.runtime/
+build/
+dist/
+.pytest_cache/
+*.pdf
+*.png
+!tests/fixtures/*.pdf
+!docs/assets/*.png
+release-assets/
+
+# Local research and build evidence; these are not part of the public app.
+/AGENTS.md
+/infra/
+/licenses/linux-build/
+/docs/analysis-plan.md
+/docs/background-handoff.md
+/docs/reader-observations.md
+/docs/review.md
+/docs/verification.md
+/packaging/windows/*

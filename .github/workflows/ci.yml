@@ -1,0 +1,39 @@
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
+          cache: pip
+          cache-dependency-path: packaging/requirements-release.txt
+      - name: Install Linux display libraries and Poppler
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0
+      - run: python -m pip install -r packaging/requirements-release.txt
+      - name: Unit and UI regressions
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest discover -s tests -v
+      - name: Native Linux acceptance
+        if: runner.os == 'Linux'
+        run: xvfb-run -a python packaging/smoke.py --output build/source-smoke
+      - name: Native Windows acceptance
+        if: runner.os == 'Windows'
+        run: python packaging/smoke.py --output build/source-smoke
