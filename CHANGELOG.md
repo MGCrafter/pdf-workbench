@@ -1,5 +1,15 @@
 # Änderungen
 
+## 0.4.0
+
+Die Oberfläche gibt es jetzt auch in Dunkel. Unter **Ansicht → Darstellung**
+stehen System, Hell und Dunkel zur Wahl. Die App merkt sich die Einstellung;
+bei System folgt sie einem Wechsel des Betriebssystems auch im offenen Fenster.
+
+Dialoge, Miniaturen, Symbole und Statusanzeigen passen sich an. Die PDF-Seite,
+Markierungen und Unterschriften behalten ihre Farben. Zoom, Scrollposition und
+ungespeicherte Änderungen bleiben beim Umschalten erhalten.
+
 ## 0.3.0
 
 Die erste Version zum Herunterladen für Windows und Linux.

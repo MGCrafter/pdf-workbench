@@ -91,3 +91,11 @@ Workbench-Sitzung mit Undo-Verlauf oder der ursprünglichen Aufteilung in Quelld
 | Ganze Seite / Seitenbreite | Strg + 0 / Strg + 1 |
 
 Die Menüs zeigen die auf deinem Betriebssystem verwendeten Tastenkürzel an.
+
+## Darstellung
+
+Unter **Ansicht → Darstellung** gibt es **System**, **Hell** und **Dunkel**.
+Die App speichert die Auswahl. Mit **System** folgt die Oberfläche dem hellen
+oder dunklen Erscheinungsbild des Betriebssystems, auch wenn es während der
+Benutzung wechselt. Ein manueller Wechsel verändert weder die PDF-Farben noch
+Zoom, Scrollposition oder den Verlauf deiner Änderungen.

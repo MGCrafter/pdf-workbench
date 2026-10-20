@@ -2,6 +2,7 @@
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from .theme import semantic_label
 
 
 class CommentDialog(QDialog):
@@ -72,7 +73,7 @@ class SignatureDialog(QDialog):
         row = QHBoxLayout(); clear = QPushButton("Neu zeichnen"); clear.clicked.connect(self.pad.clear); row.addWidget(clear); row.addStretch()
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept); self.buttons.rejected.connect(self.reject); row.addWidget(self.buttons); layout.addLayout(row)
-        self.validation = QLabel(); self.validation.setStyleSheet("color: #9f3c21"); layout.addWidget(self.validation)
+        self.validation = QLabel(); semantic_label(self.validation, "error"); layout.addWidget(self.validation)
 
     def accept(self):
         if self.pad.normalized_strokes(): super().accept()

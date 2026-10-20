@@ -5,6 +5,7 @@ from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRectF, QSize, Qt, QTimer, 
 from PyQt6.QtGui import QColor, QDrag, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate
 from .annotation_overlay import draw_annotations
+from .theme import color
 
 UID_ROLE = Qt.ItemDataRole.UserRole
 PAGE_ROLE = int(Qt.ItemDataRole.UserRole) + 1
@@ -28,9 +29,10 @@ class PageDelegate(QStyledItemDelegate):
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
         active = self.view.currentIndex() == index
         hover = bool(option.state & QStyle.StateFlag.State_MouseOver)
-        fill = "#e9f0ff" if selected else ("#f7f9fc" if hover else "#ffffff")
-        painter.setBrush(QColor(fill))
-        painter.setPen(QPen(QColor("#2f5fc5" if active else ("#a9bfeb" if selected else "#d6dde6")), 2 if active else 1))
+        enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+        fill = ("card_selected" if selected else ("card_hover" if hover else "surface")) if enabled else "disabled_surface"
+        painter.setBrush(color(fill))
+        painter.setPen(QPen(color("focus" if active else ("selection_border" if selected else "divider")), 2 if active else 1))
         painter.drawRoundedRect(QRectF(rect), 6, 6)
         page = index.data(PAGE_ROLE)
         source = index.data(SOURCE_ROLE)
@@ -53,35 +55,35 @@ class PageDelegate(QStyledItemDelegate):
             scaled = image.size().scaled(image_box.size(), Qt.AspectRatioMode.KeepAspectRatio)
             paper = QRectF(0, 0, scaled.width(), scaled.height())
             paper.moveCenter(QRectF(image_box).center())
-            painter.fillRect(paper.translated(2, 2), QColor("#d6dde6"))
+            painter.fillRect(paper.translated(2, 2), color("shadow"))
             painter.fillRect(paper, QColor("#ffffff"))
             painter.drawImage(paper, image)
             draw_annotations(painter, paper, page)
         else:
             paper = QRectF(0, 0, min(image_box.width(), image_box.height() * 0.68), image_box.height())
             paper.moveCenter(QRectF(image_box).center())
-            painter.setPen(QPen(QColor("#d4dce7"), 1)); painter.setBrush(QColor("#f5f7fa"))
+            painter.setPen(QPen(color("border"), 1)); painter.setBrush(color("placeholder"))
             painter.drawRect(paper)
-            painter.setPen(QColor("#64748b"))
+            painter.setPen(color("muted"))
             painter.drawText(paper, Qt.AlignmentFlag.AlignCenter, str(position))
         font = QFont(option.font)
         font.setBold(True)
         painter.setFont(font)
-        painter.setPen(QColor("#17243b"))
+        painter.setPen(color("text" if enabled else "disabled"))
         title = f"Seite {position}" if self.view.grid_mode else f"{position:02d}  {source.label}"
         painter.drawText(title_box, Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(title, Qt.TextElideMode.ElideRight, title_box.width()))
         font.setBold(False); font.setPointSizeF(max(8.5, option.font.pointSizeF() - 0.5)); painter.setFont(font)
         detail = source.label if self.view.grid_mode else f"Originalseite {page.page_index + 1}  ·  +{page.rotation}°"
-        painter.setPen(QColor("#526278"))
+        painter.setPen(color("muted" if enabled else "disabled"))
         painter.drawText(detail_box, Qt.AlignmentFlag.AlignVCenter, painter.fontMetrics().elidedText(detail, Qt.TextElideMode.ElideRight, detail_box.width()))
         if selected:
             badge = QRectF(rect.right() - 24, rect.top() + 8, 16, 16)
-            painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QColor("#2f5fc5")); painter.drawEllipse(badge)
-            painter.setPen(QPen(QColor("white"), 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(color("accent")); painter.drawEllipse(badge)
+            painter.setPen(QPen(color("on_accent"), 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
             path = QPainterPath(QPointF(badge.x() + 4, badge.y() + 8)); path.lineTo(badge.x() + 7, badge.y() + 11); path.lineTo(badge.x() + 12, badge.y() + 5)
             painter.drawPath(path)
         if active:
-            painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QColor("#2f5fc5"))
+            painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(color("accent"))
             painter.drawRoundedRect(QRectF(rect.left(), rect.top() + 15, 3, rect.height() - 30), 1.5, 1.5)
         painter.restore()
 
@@ -198,7 +200,7 @@ class PageList(QListWidget):
         rect = self.visualItemRect(self.item(row))
         after = self._drop_after or self._drop_row == self.count()
         painter = QPainter(self.viewport())
-        painter.setPen(QPen(QColor("#285cc4"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setPen(QPen(color("accent"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         if self.grid_mode:
             x = rect.right() + 2 if after else rect.left() - 2
             # Keep the entire three-pixel stroke inside the viewport, including

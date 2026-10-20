@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 
 from ..core import PdfWorkbenchError
 from ..features import parse_page_selection
+from .theme import file_dialog_options, semantic_label
 
 
 class PageRangeDialog(QDialog):
@@ -46,11 +47,11 @@ class PageRangeDialog(QDialog):
         try:
             self.selected_indices = parse_page_selection(text, self.page_count)
             self.error_label.setText(f"{len(self.selected_indices)} Seite(n) werden ausgewählt.")
-            self.error_label.setStyleSheet("color: #526278;")
+            semantic_label(self.error_label, "muted")
             valid = True
         except PdfWorkbenchError as error:
             self.selected_indices = []
-            self.error_label.setText(str(error)); self.error_label.setStyleSheet("color: #a52b2b;")
+            self.error_label.setText(str(error)); semantic_label(self.error_label, "error")
             valid = False
         self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(valid)
 
@@ -91,7 +92,7 @@ class SeparateExportDialog(QDialog):
         self.validate()
 
     def browse(self):
-        path = QFileDialog.getExistingDirectory(self, "Übergeordneten Zielordner wählen", self.parent_edit.text())
+        path = QFileDialog.getExistingDirectory(self, "Übergeordneten Zielordner wählen", self.parent_edit.text(), options=QFileDialog.Option.ShowDirsOnly | file_dialog_options())
         if path:
             self.parent_edit.setText(path)
 
@@ -107,7 +108,7 @@ class SeparateExportDialog(QDialog):
             error = "Dieser Unterordner existiert bereits. Bitte einen neuen Namen wählen."
         self.destination = None if error else parent / name
         self.error_label.setText(error or str(self.destination))
-        self.error_label.setStyleSheet("color: #a52b2b;" if error else "color: #526278;")
+        semantic_label(self.error_label, "error" if error else "muted")
         self.buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(error is None)
 
     @staticmethod

@@ -9,7 +9,7 @@ import threading
 import uuid
 
 from PyQt6.QtCore import QItemSelectionModel, QSize, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QKeySequence, QPalette
+from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QListWidgetItem, QMainWindow, QMessageBox, QProgressBar,
@@ -27,6 +27,7 @@ from .ui.icons import icon
 from .ui.pages import PAGE_ROLE, POSITION_ROLE, SOURCE_ROLE, UID_ROLE, PageList
 from .ui.preview import Preview
 from .ui.rendering import RenderBroker
+from .ui.theme import file_dialog_options, semantic_label, stylesheet, theme_controller
 
 
 class Job(QThread):
@@ -52,6 +53,7 @@ class Job(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.theme = theme_controller()
         self.workspace = Workspace()
         self.job = None
         self.saved_state = ()
@@ -68,13 +70,15 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._build_ui()
         self._build_menu()
+        self.theme.changed.connect(self._theme_changed)
+        self.theme.preference_changed.connect(self._sync_theme_actions)
         self.refresh()
 
     def _button(self, text, slot, symbol=None, primary=False):
         button = QPushButton(text)
         button.setMinimumHeight(34)
         if symbol:
-            button.setIcon(icon(symbol, "white" if primary else None)); button.setIconSize(QSize(18, 18))
+            button.setIcon(icon(symbol, "on_accent" if primary else None)); button.setIconSize(QSize(18, 18))
         if primary:
             button.setObjectName("primary")
         button.clicked.connect(slot)
@@ -153,7 +157,7 @@ class MainWindow(QMainWindow):
         welcome = QFrame(); welcome.setObjectName("welcome")
         welcome_layout = QVBoxLayout(welcome); welcome_layout.setContentsMargins(24, 28, 24, 28); welcome_layout.setSpacing(12)
         welcome_layout.addStretch()
-        document = QLabel(); document.setPixmap(icon("document", "#647da6").pixmap(QSize(42, 42))); welcome_layout.addWidget(document)
+        self.empty_document = QLabel(); self.empty_document.setPixmap(icon("document", "muted").pixmap(QSize(42, 42))); welcome_layout.addWidget(self.empty_document)
         empty_title = QLabel("PDFs hinzufügen"); empty_title.setObjectName("emptyTitle"); welcome_layout.addWidget(empty_title)
         empty_hint = QLabel("Dateien hierher ziehen oder auswählen. Danach Seiten ordnen und als neue PDF speichern.")
         empty_hint.setWordWrap(True); empty_hint.setObjectName("muted"); welcome_layout.addWidget(empty_hint)
@@ -272,6 +276,18 @@ class MainWindow(QMainWindow):
         self.zoom_out_action = self._action(view_menu, "Verkleinern", QKeySequence.StandardKey.ZoomOut, self.preview.zoom_out, "zoom_out")
         self.fit_page_action = self._action(view_menu, "Ganze Seite einpassen", "Ctrl+0", self.preview.fit_page, "fit_page")
         self.fit_width_action = self._action(view_menu, "Seitenbreite einpassen", "Ctrl+1", self.preview.fit_width, "fit_width")
+        view_menu.addSeparator()
+        appearance = view_menu.addMenu("Darstellung")
+        self.theme_group = QActionGroup(self)
+        self.theme_group.setExclusive(True)
+        self.theme_actions = {}
+        for mode, label in (("system", "System"), ("light", "Hell"), ("dark", "Dunkel")):
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.triggered.connect(lambda checked, selected=mode: self.theme.set_preference(selected))
+            self.theme_group.addAction(action); appearance.addAction(action)
+            self.theme_actions[mode] = action
+        self._sync_theme_actions()
         annotate = self.menuBar().addMenu("&Anmerkungen")
         self.pan_action = self._action(annotate, "Hand: Seite verschieben", None, lambda: self.set_annotation_tool("pan"), "hand")
         self.comment_action = self._action(annotate, "Kommentar hinzufügen", None, lambda: self.set_annotation_tool("comment"), "comment")
@@ -280,6 +296,14 @@ class MainWindow(QMainWindow):
         annotate.addSeparator()
         self.annotations_action = self._action(annotate, "Anmerkungen bearbeiten oder löschen …", None, self.manage_annotations, "list")
         help_menu = self.menuBar().addMenu("&Hilfe"); self._action(help_menu, "Über PDF Workbench", None, self.about)
+
+    def _sync_theme_actions(self, *_):
+        self.theme_actions[self.theme.preference].setChecked(True)
+
+    def _theme_changed(self, *_):
+        self.empty_document.setPixmap(icon("document", "muted").pixmap(QSize(42, 42)))
+        self.page_list.viewport().update()
+        self.preview.canvas.update()
 
     def selected_ids(self):
         return {item.data(UID_ROLE) for item in self.page_list.selectedItems()}
@@ -447,7 +471,7 @@ class MainWindow(QMainWindow):
             self.update_zoom_controls(self.preview.zoom_factor, self.preview.zoom_mode)
 
     def open_dialog(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "PDFs hinzufügen", "", "PDF-Dateien (*.pdf);;Alle Dateien (*)")
+        files, _ = QFileDialog.getOpenFileNames(self, "PDFs hinzufügen", "", "PDF-Dateien (*.pdf);;Alle Dateien (*)", options=file_dialog_options())
         if files: self.import_files(files)
 
     def import_files(self, files):
@@ -471,8 +495,9 @@ class MainWindow(QMainWindow):
             if errors: self.show_error("Einige Dateien konnten nicht geöffnet werden.", "\n\n".join(errors))
         self.start_job(task, success)
 
-    def set_status(self, text):
+    def set_status(self, text, tone="normal"):
         self.status.setText(text); self.status.setToolTip(text)
+        semantic_label(self.status, tone)
 
     def start_job(self, task, success):
         job = Job(task, self); self.job = job
@@ -487,7 +512,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(value); self.set_status(message)
 
     def job_cancelled(self, message):
-        self.set_status(message)
+        self.set_status(message, "warning")
         if "verblieben:" in message or "Nicht vollständig bereinigt" in message:
             self.show_error("Abgebrochen: Hinweise zu verbliebenen Dateien", message)
 
@@ -555,7 +580,7 @@ class MainWindow(QMainWindow):
         pages = [page for page in self.workspace.pages if not selected_only or page.uid in selected]
         if not pages: return
         title = "Ausgewählte Seiten als neue PDF speichern" if selected_only else "Alle Seiten als neue PDF speichern"
-        filename, _ = QFileDialog.getSaveFileName(self, title, "auswahl.pdf" if selected_only else "zusammengefuegt.pdf", "PDF-Dateien (*.pdf)", options=QFileDialog.Option.DontConfirmOverwrite)
+        filename, _ = QFileDialog.getSaveFileName(self, title, "auswahl.pdf" if selected_only else "zusammengefuegt.pdf", "PDF-Dateien (*.pdf)", options=QFileDialog.Option.DontConfirmOverwrite | file_dialog_options())
         if not filename: return
         path = Path(filename)
         if not path.suffix: path = path.with_suffix(".pdf")
@@ -604,7 +629,7 @@ class MainWindow(QMainWindow):
         if self._closing_requested: self.close()
 
     def show_error(self, title, detail):
-        self.set_status(title)
+        self.set_status(title, "error")
         box = QMessageBox(QMessageBox.Icon.Warning, "PDF Workbench", title, QMessageBox.StandardButton.Ok, self)
         box.setInformativeText(detail[:1800])
         if len(detail) > 1800: box.setDetailedText(detail)
@@ -621,44 +646,8 @@ class MainWindow(QMainWindow):
             self.import_files([url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]); event.acceptProposedAction()
 
 
-STYLE = """
-QMainWindow, QWidget { background: #f4f6f9; color: #17243b; }
-QWidget { font-size: 13px; }
-QLabel#title { font-size: 20px; font-weight: 650; margin-right: 10px; }
-QLabel#sectionTitle { font-size: 15px; font-weight: 600; }
-QLabel#emptyTitle { font-size: 20px; font-weight: 600; }
-QLabel#muted, QLabel#toolCaption { color: #526278; font-size: 12px; }
-QLabel#toolCaption { margin-left: 3px; margin-right: 5px; }
-QFrame#toolbar { background: #ffffff; border: 1px solid #d6dde6; border-radius: 6px; }
-QFrame#toolbar QLabel { background: transparent; }
-QFrame#separator { color: #d6dde6; }
-QFrame#footer { border-top: 1px solid #d6dde6; }
-QPushButton { background: #ffffff; border: 1px solid #a7b5c8; border-radius: 5px; padding: 5px 11px; }
-QPushButton:hover { background: #e9eff8; border-color: #6683ae; }
-QPushButton:pressed { background: #dae5f7; }
-QPushButton:focus { border: 2px solid #2f5fc5; padding: 4px 10px; }
-QPushButton:disabled { background: #eef1f5; color: #78869a; border-color: #d0d7e2; }
-QPushButton#primary { color: white; background: #285cc4; border-color: #285cc4; }
-QPushButton#primary:hover { background: #204da7; }
-QPushButton#primary:focus { border: 2px solid #142c5b; }
-QPushButton#primary:disabled { background: #cbd6e9; color: #526278; border-color: #cbd6e9; }
-QToolButton { border: 1px solid transparent; border-radius: 4px; padding: 4px; background: transparent; }
-QToolButton:hover { background: #e9eff8; border-color: #c1cfe4; }
-QToolButton:checked { background: #dde8fc; border-color: #9cb5e2; }
-QToolButton:focus { border: 2px solid #2f5fc5; padding: 3px; }
-QToolButton:disabled { color: #8390a3; }
-QListWidget { background: #edf1f6; border: 1px solid #c7d1df; border-radius: 5px; padding: 4px; }
-QListWidget:focus { border: 2px solid #6683ae; padding: 3px; }
-QFrame#welcome { background: #ffffff; border: 1px dashed #a7b5c8; border-radius: 6px; }
-QFrame#welcome QLabel { background: transparent; border: none; }
-QComboBox, QLineEdit { background: white; border: 1px solid #a7b5c8; padding: 6px; border-radius: 4px; }
-QComboBox:focus, QLineEdit:focus { border: 2px solid #2f5fc5; padding: 5px; }
-QProgressBar { background: #dae5f7; border: none; border-radius: 2px; }
-QProgressBar::chunk { background: #2f5fc5; }
-QMenuBar, QMenu { background: #ffffff; }
-QMenu::item:selected { background: #dde8fc; }
-QSplitter::handle { background: #f4f6f9; }
-"""
+# Kept for existing source smoke launchers; normal startup uses ThemeController.
+STYLE = stylesheet("light")
 
 
 def main(argv=None):
@@ -668,10 +657,7 @@ def main(argv=None):
     app = QApplication([sys.argv[0]])
     app.setApplicationName("PDF Workbench"); app.setApplicationVersion(__version__); app.setOrganizationName("PDF Workbench")
     app.setStyle("Fusion")
-    palette = app.palette()
-    for role, value in ((QPalette.ColorRole.Window, "#f4f6f9"), (QPalette.ColorRole.WindowText, "#17243b"), (QPalette.ColorRole.Base, "#ffffff"), (QPalette.ColorRole.Text, "#17243b"), (QPalette.ColorRole.Button, "#ffffff"), (QPalette.ColorRole.ButtonText, "#17243b"), (QPalette.ColorRole.Highlight, "#dde8fc"), (QPalette.ColorRole.HighlightedText, "#17243b")):
-        palette.setColor(role, QColor(value))
-    app.setPalette(palette); app.setStyleSheet(STYLE)
+    theme_controller(app)
     window = MainWindow(); window.show()
     if args.pdfs: QTimer.singleShot(0, lambda: window.import_files(args.pdfs))
     return app.exec()

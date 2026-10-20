@@ -96,6 +96,24 @@ class ReleaseAcceptanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify()
 
+    def test_dark_mode_release_requires_all_native_appearance_checks(self):
+        self.version = self.provenance['app_version'] = '0.4.0'
+        required = ['appearance dark/light/system', 'appearance persisted',
+                    'appearance preserves document and viewport', 'appearance document/export colors',
+                    'appearance dialogs and icons']
+        for target, platform_name in (('linux', 'xcb'), ('win32', 'windows')):
+            report, _ = self.prepare(target, platform_name)
+            with self.subTest(target=target, absent='all'), self.assertRaises(ValueError):
+                self.verify(target)
+            for missing in required:
+                report['gui']['checks'] = [name for name in required if name != missing]
+                self.write_report(report)
+                with self.subTest(target=target, absent=missing), self.assertRaises(ValueError):
+                    self.verify(target)
+            report['gui']['checks'] = required
+            self.write_report(report)
+            self.assertEqual(self.verify(target), report)
+
     def test_previous_build_cannot_be_released_as_a_different_checkout(self):
         self.prepare()
         identities = {

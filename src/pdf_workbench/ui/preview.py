@@ -6,6 +6,7 @@ from PyQt6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QImage, QPainter, QPen
 from PyQt6.QtWidgets import QApplication, QScrollArea, QSizePolicy, QWidget
 from .annotation_overlay import display_to_basis, draw_annotations, map_point
+from .theme import color
 
 
 class PreviewCanvas(QWidget):
@@ -20,21 +21,22 @@ class PreviewCanvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#e8edf3"))
+        painter.fillRect(self.rect(), color("canvas"))
         view = self.view
         if view.page is None or view.image.isNull():
-            painter.setPen(QColor("#526278"))
+            painter.setPen(color("muted"))
             painter.drawText(self.rect().adjusted(24, 24, -24, -24), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, view.message)
             return
         paper = view.paper_rect()
-        painter.fillRect(paper.translated(3, 4), QColor("#cbd4e0"))
+        painter.fillRect(paper.translated(3, 4), color("shadow"))
         painter.fillRect(paper, QColor("white"))
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.drawImage(paper, view.image)
         draw_annotations(painter, paper, view.page)
         if self._placement_start is not None and self._placement_end is not None:
-            painter.setPen(QPen(QColor("#285cc4"), 1.5, Qt.PenStyle.DashLine))
-            painter.setBrush(QColor(40, 92, 196, 25))
+            painter.setPen(QPen(color("accent"), 1.5, Qt.PenStyle.DashLine))
+            fill = color("accent"); fill.setAlpha(25)
+            painter.setBrush(fill)
             painter.drawRect(QRectF(self._placement_start, self._placement_end).normalized())
 
     def wheelEvent(self, event):

@@ -241,13 +241,24 @@ class PdfAcceptance(unittest.TestCase):
             self.assertEqual(page['/Annots'][0].get_object().raw_get('/P'), page.indirect_reference)
 
 def gui_acceptance(directory: Path):
-    from PyQt6.QtCore import QEvent, QItemSelectionModel, QPoint, QPointF, QT_VERSION_STR, PYQT_VERSION_STR, Qt, qVersion
-    from PyQt6.QtGui import QMouseEvent, QWheelEvent
+    from PyQt6.QtCore import QEvent, QItemSelectionModel, QObject, QPoint, QPointF, QSettings, QSize, QT_VERSION_STR, PYQT_VERSION_STR, Qt, pyqtSignal, qVersion
+    from PyQt6.QtGui import QMouseEvent, QPalette, QWheelEvent
     from PyQt6.QtWidgets import QApplication
-    from pdf_workbench.app import MainWindow, STYLE
+    from pdf_workbench.app import MainWindow
+    from pdf_workbench.ui.theme import ThemeController, COLORS
+    from pdf_workbench.ui.annotation_dialogs import CommentDialog
+    from PyQt6.QtPdf import QPdfDocument
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLE)
+    class SystemHints(QObject):
+        colorSchemeChanged = pyqtSignal(object)
+        scheme = Qt.ColorScheme.Light
+        def colorScheme(self): return self.scheme
+    hints = SystemHints()
+    settings_path = directory / 'appearance-test.ini'
+    settings = QSettings(str(settings_path), QSettings.Format.IniFormat)
+    settings.setValue(ThemeController.KEY, 'light')
+    controller = ThemeController(app, settings=settings, style_hints=hints)
     if os.name == "nt" and app.platformName() != "windows":
         raise AssertionError(f"Expected native Windows Qt platform, got {app.platformName()}")
     source_a, source_b = directory / "gui-a.pdf", directory / "gui-b.pdf"
@@ -439,9 +450,57 @@ def gui_acceptance(directory: Path):
         assert [a['/Subtype'] for a in edited] == ['/Text', '/Ink']
         assert edited[0]['/Contents'] == 'Windows: bearbeitet nach Wiederöffnen'
         preview.fit_page(); window.pan_button.click(); app.processEvents()
+        # Exercise the actual theme actions against isolated persisted settings.
+        preview.set_zoom(2)
+        wait_for(lambda: not preview._timer.isActive() and window.render_broker.pending_count == 0)
+        horizontal, vertical = preview.scroll.horizontalScrollBar(), preview.scroll.verticalScrollBar()
+        horizontal.setValue(horizontal.maximum() // 2)
+        vertical.setValue(vertical.maximum() // 2)
+        state = (tuple(window.workspace.pages), window.saved_state, window.workspace.can_undo,
+                 window.workspace.can_redo, preview.zoom_factor, horizontal.value(), vertical.value())
+        paper_image = preview.image.copy()
+        light_icon = window.pan_button.icon().pixmap(QSize(24, 24)).toImage()
+        window.theme_actions['dark'].trigger(); app.processEvents()
+        assert controller.preference == 'dark' and controller.effective_name == 'dark'
+        assert window.pan_button.icon().pixmap(QSize(24, 24)).toImage() != light_icon
+        assert (tuple(window.workspace.pages), window.saved_state, window.workspace.can_undo,
+                window.workspace.can_redo, preview.zoom_factor, horizontal.value(), vertical.value()) == state
+        assert preview.image == paper_image
+        restored = QSettings(str(settings_path), QSettings.Format.IniFormat)
+        assert restored.value(ThemeController.KEY) == 'dark'
+        dialog = CommentDialog(window)
+        dialog.show(); app.processEvents()
+        assert dialog.editor.palette().color(QPalette.ColorRole.Base).name() == COLORS['dark']['surface']
+        window.theme_actions['light'].trigger(); app.processEvents()
+        assert controller.effective_name == 'light'
+        assert dialog.editor.palette().color(QPalette.ColorRole.Base).name() == COLORS['light']['surface']
+        dialog.close(); dialog.deleteLater()
+        app.sendPostedEvents(None, QEvent.Type.DeferredDelete); app.processEvents()
+        hints.scheme = Qt.ColorScheme.Dark
+        window.theme_actions['system'].trigger(); app.processEvents()
+        assert controller.preference == 'system' and controller.effective_name == 'dark'
+        hints.scheme = Qt.ColorScheme.Light; hints.colorSchemeChanged.emit(hints.scheme); app.processEvents()
+        assert controller.effective_name == 'light'
+        window.theme_actions['dark'].trigger()
+        hints.colorSchemeChanged.emit(Qt.ColorScheme.Light); app.processEvents()
+        assert controller.effective_name == 'dark' and controller.preference == 'dark'
+        themed_output = directory / 'gui-dark-export.pdf'
+        export_pdf(window.workspace.sources, window.workspace.pages, themed_output)
+        def render_pdf(path):
+            document = QPdfDocument(None)
+            document.load(str(path))
+            assert document.status() == QPdfDocument.Status.Ready
+            from PyQt6.QtPdf import QPdfDocumentRenderOptions
+            options = QPdfDocumentRenderOptions()
+            options.setRenderFlags(QPdfDocumentRenderOptions.RenderFlag.Annotations)
+            image = document.render(0, QSize(300, 500), options)
+            document.close()
+            return image
+        assert render_pdf(edited_output) == render_pdf(themed_output), 'Theme changed exported document colors'
+        preview.fit_page(); app.processEvents()
         screenshot = directory / "native-window.png"
         assert window.grab().save(str(screenshot))
-        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates"]}
+        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates", "appearance dark/light/system", "appearance persisted", "appearance preserves document and viewport", "appearance document/export colors", "appearance dialogs and icons"]}
     finally:
         if window.job:
             window.job.cancel_event.set()

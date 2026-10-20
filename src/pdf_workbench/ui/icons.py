@@ -1,6 +1,7 @@
 """Small original vector icons, painted at the target display resolution."""
 from PyQt6.QtCore import QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import QColor, QIcon, QIconEngine, QPainter, QPainterPath, QPen, QPixmap
+from .theme import COLORS, color as theme_color
 
 
 class VectorIcon(QIconEngine):
@@ -28,8 +29,13 @@ class VectorIcon(QIconEngine):
         painter.setRenderHint(painter.RenderHint.Antialiasing)
         painter.translate(rect.x(), rect.y())
         painter.scale(rect.width() / 24, rect.height() / 24)
-        color = "#94a3b8" if mode == QIcon.Mode.Disabled else (self.color or "#334155")
-        painter.setPen(QPen(QColor(color), 1.7, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        if mode == QIcon.Mode.Disabled:
+            foreground = theme_color("disabled")
+        elif self.color in COLORS["light"]:
+            foreground = theme_color(self.color)
+        else:
+            foreground = QColor(self.color) if self.color else theme_color("icon")
+        painter.setPen(QPen(foreground, 1.7, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         p = QPainterPath()
         name = self.name

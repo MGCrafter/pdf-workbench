@@ -8,10 +8,10 @@ lokal, ohne Konto und ohne Upload deiner Dokumente.
 
 ## Download
 
-| System | Download für v0.3.0 |
+| System | Download für v0.4.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.3.0/PDFWorkbench-v0.3.0-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.3.0/PDFWorkbench-v0.3.0-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.4.0/PDFWorkbench-v0.4.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.4.0/PDFWorkbench-v0.4.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -24,7 +24,7 @@ bleiben.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.3.0-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.4.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
@@ -41,6 +41,7 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Kommentare und Textmarkierungen hinzufügen, bearbeiten und löschen.
 - Eine Unterschrift zeichnen und auf der Seite platzieren.
 - Seiten als Miniaturen ansehen und in der Vorschau zoomen und verschieben.
+- Helle oder dunkle Oberfläche; auf Wunsch passend zur Systemeinstellung.
 
 ## Loslegen
 
@@ -63,6 +64,10 @@ Eigene Anmerkungen bleiben nach dem Speichern und erneuten Öffnen bearbeitbar.
 Der blaue Rahmen zeigt die Seite in der Vorschau, die Häkchen zeigen die
 Auswahl für die Werkzeuge. Mehr zur Bedienung steht in der
 [kurzen Anleitung](docs/usage.md).
+
+Unter **Ansicht → Darstellung** wählst du **System**, **Hell** oder **Dunkel**.
+Die Auswahl bleibt beim nächsten Start erhalten. Die PDF-Seiten behalten ihre
+Originalfarben.
 
 ## Maus und Tastatur
 

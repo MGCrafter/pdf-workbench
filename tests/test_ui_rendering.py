@@ -20,6 +20,7 @@ from pdf_workbench.app import MainWindow
 from pdf_workbench.core import OperationCancelled, PageRef, PdfWorkbenchError, SourceDocument, load_source
 from pdf_workbench.ui.dialogs import PageRangeDialog, SeparateExportDialog
 from pdf_workbench.ui.icons import VectorIcon
+from pdf_workbench.ui.theme import color as theme_color
 from pdf_workbench.ui.pages import MIME, PageList
 from pdf_workbench.ui.preview import Preview
 from pdf_workbench.ui.rendering import RenderBroker
@@ -202,7 +203,7 @@ class UiRenderingTests(unittest.TestCase):
                 image = view.viewport().grab().toImage()
                 width, height = image.width(), image.height()
                 edge = range(max(0, width - 8), width) if after else range(min(8, width))
-                pixels = sum(image.pixelColor(x, y).name() == "#285cc4" for x in edge for y in range(height))
+                pixels = sum(image.pixelColor(x, y) == theme_color("accent") for x in edge for y in range(height))
                 self.assertGreater(pixels, 100)
         finally:
             view.close()

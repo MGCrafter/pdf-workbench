@@ -38,6 +38,12 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
             or core.get('skipped') != [] or gui.get('result') != 'PASS'
             or gui.get('qt_platform') not in native_platforms or gui.get('app_version') != version):
         raise ValueError('A successful native frozen PDF/UI acceptance is required.')
+    if tuple(int(part) for part in version.split('.')[:2]) >= (0, 4):
+        required = {'appearance dark/light/system', 'appearance persisted',
+                    'appearance preserves document and viewport', 'appearance document/export colors',
+                    'appearance dialogs and icons'}
+        if not required <= set(gui.get('checks', [])):
+            raise ValueError('A complete native theme acceptance is required for this version.')
     return report
 
 
