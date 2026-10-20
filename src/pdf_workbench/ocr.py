@@ -449,7 +449,8 @@ def discover_engine(executable=None, cache_dir=None, *, cancel=None) -> OcrEngin
         raise OcrError(f"Tesseract konnte nicht geprüft werden: {error}") from error
     output = result[0] + "\n" + result[1]
     match = re.search(r'List of available languages in "([^"]+)"', output)
-    reported_languages = set(re.findall(r"^([a-z][a-z0-9_/-]+)$", output, re.M))
+    reported_languages = {line for line in output.splitlines()
+                          if re.fullmatch(r"[a-z][a-z0-9_/-]+", line)}
     prefix = path.parent.parent
     candidates = []
     if match:

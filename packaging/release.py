@@ -86,7 +86,7 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                 'source_sha256': source_hashes,
                 'executable_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
                 'acceptance': {'core': report['core'], 'gui_checks': report['gui']['checks'],
-                               'qt_platform': report['gui']['qt_platform']},
+                               'qt_platform': report['gui']['qt_platform'], 'ocr': report['gui'].get('ocr')},
                 'signed': False}
     (bundle / 'BUILD-INFO.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
     instructions = ('PDF Workbench ' + version + '\n\n'
@@ -97,6 +97,11 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                     'Python muss nicht installiert werden.\n\n'
                     'PDFs hinzufügen, Seiten auswählen und anordnen.\n'
                     'Die Vorschau bietet Kommentare, Textmarkierungen und gezeichnete Unterschriften.\n'
+                    'Einfügen ergänzt Textfelder, Bilder, Stempel, Häkchen und Kreuze.\n'
+                    'Mit dem Pfeilwerkzeug auswählen und ziehen; Doppelklick bearbeitet.\n'
+                    'Strg+F sucht Text. Unter Datei lassen sich Bilder als PDF-Seiten übernehmen.\n'
+                    'Datei > Durchsuchbare PDF erstellen nutzt optional eine lokale Tesseract-Installation.\n'
+                    'Ansicht > Darstellung bietet System, Hell und Dunkel.\n'
                     'PDF speichern schreibt eine neue Datei; Originale werden nicht geändert.\n\n'
                     'Anleitung: https://github.com/MGCrafter/pdf-workbench#loslegen\n'
                     'Quellcode und Drittanbieterquellen: https://github.com/MGCrafter/pdf-workbench/releases\n')
@@ -123,6 +128,10 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
         with tarfile.open(archive, 'r:gz') as stream:
             if 'PDFWorkbench/PDFWorkbench' not in stream.getnames():
                 raise ValueError('Linux release archive has no executable.')
+    for label, payload in (('BUILD-INFO', metadata), ('acceptance', report)):
+        path = output / f'PDFWorkbench-v{version}-{target}-{label}.json'
+        with path.open('x', encoding='utf-8') as stream:
+            stream.write(json.dumps(payload, indent=2) + '\n')
     print(f'{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}')
     return archive
 

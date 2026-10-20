@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.2
+
+- Windows-Sprachlisten mit CRLF-Zeilenenden werden korrekt gelesen.
+- Release-Prüfungen verlangen OCR schon beim Test des Quellcodes und geben die
+  erkannte Engine, Sprachen und Schriftdatei an.
+- Kleine Abnahme- und Buildberichte liegen neben den fertigen Downloads.
+
 ## 0.5.1
 
 - Tesseract-Versionen mit `v` vor der Versionsnummer werden unter Windows erkannt.

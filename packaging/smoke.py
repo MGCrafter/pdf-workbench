@@ -317,6 +317,11 @@ def feature_acceptance(window, directory, app, wait_for):
     # OCR is optional for users, mandatory in release CI with a prepared engine.
     ocr_cache = os.environ.get('PDF_WORKBENCH_OCR_TEST_TESSDATA')
     engine = discover_engine(cache_dir=ocr_cache)
+    ocr_info = {'version': engine.version if engine else None,
+                'executable': str(engine.executable) if engine else None,
+                'languages': list(engine.languages) if engine else [],
+                'pdf_font': str(engine.pdf_font) if engine and engine.pdf_font else None}
+    print('Native OCR engine: ' + json.dumps(ocr_info))
     if engine and engine.pdf_font and 'eng' in engine.languages:
         scanned = QImage(900, 250, QImage.Format.Format_RGB32); scanned.fill(QColor('white'))
         painter = QPainter(scanned); painter.setPen(QColor('black'))
@@ -331,8 +336,8 @@ def feature_acceptance(window, directory, app, wait_for):
         assert PdfReader(result.path).pages[0]['/Resources']['/XObject']
         checks.append('local OCR searchable text and preserved image')
     elif os.environ.get('PDF_WORKBENCH_REQUIRE_OCR') == '1':
-        raise AssertionError('The native release OCR check requires Tesseract, English and pdf.ttf')
-    return checks
+        raise AssertionError('The native release OCR check requires Tesseract, English and pdf.ttf: ' + json.dumps(ocr_info))
+    return checks, ocr_info
 
 
 def gui_acceptance(directory: Path):
@@ -592,12 +597,12 @@ def gui_acceptance(directory: Path):
             document.close()
             return image
         assert render_pdf(edited_output) == render_pdf(themed_output), 'Theme changed exported document colors'
-        feature_checks = feature_acceptance(window, directory, app, wait_for)
+        feature_checks, ocr_info = feature_acceptance(window, directory, app, wait_for)
         preview.fit_page(); app.processEvents()
         wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
         assert window.grab().save(str(screenshot))
-        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates", "appearance dark/light/system", "appearance persisted", "appearance preserves document and viewport", "appearance document/export colors", "appearance dialogs and icons"] + feature_checks}
+        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates", "appearance dark/light/system", "appearance persisted", "appearance preserves document and viewport", "appearance document/export colors", "appearance dialogs and icons"] + feature_checks, "ocr": ocr_info}
     finally:
         if window.job:
             window.job.cancel_event.set()

@@ -72,6 +72,7 @@ jobs:
       - name: Test the source
         env:
           QT_QPA_PLATFORM: offscreen
+          PDF_WORKBENCH_REQUIRE_OCR: '1'
         run: python -m unittest discover -s tests -v
       - name: Keep test-only dependencies out of the app
         run: python -m pip uninstall --yes reportlab Pillow

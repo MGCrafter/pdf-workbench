@@ -324,6 +324,25 @@ class OcrSafetyTests(unittest.TestCase):
         self.assertEqual(engine.pdf_font,font)
         self.assertEqual(ocr._language_files(engine,("eng",),self.root/"empty-cache"),{"eng":model})
 
+    def test_windows_crlf_language_inventory_finds_installed_english_and_pdf_font(self):
+        executable = self.root/"Tesseract-OCR/tesseract.exe"
+        executable.parent.mkdir();executable.write_bytes(b"engine fixture")
+        data = executable.parent/"tessdata";data.mkdir()
+        font = data/"pdf.ttf";font.write_bytes(b"PDF font fixture")
+        english = data/"eng.traineddata";english.write_bytes(b"installed English fixture")
+        (data/"osd.traineddata").write_bytes(b"installed orientation fixture")
+        inventory = f'List of available languages in "{data}" (2):\r\neng\r\nosd\r\n'
+        for output in ((inventory,""),("",inventory)):
+            with self.subTest(stream="stdout" if output[0] else "stderr"):
+                responses = [("tesseract v5.4.0.20240606\r\n leptonica-1.84.1\r\n", ""),output]
+                with patch.object(ocr,"_capture_tool",side_effect=responses):
+                    engine = ocr.discover_engine(executable,self.root/"empty-cache")
+                self.assertEqual(engine.version,"tesseract v5.4.0.20240606")
+                self.assertEqual(engine.tessdata_dir,data)
+                self.assertEqual(engine.pdf_font,font)
+                self.assertEqual(engine.languages,("eng","osd"))
+                self.assertEqual(ocr._language_files(engine,("eng",),self.root/"empty-cache"),{"eng":english})
+
     def test_4_1_data_without_a_directory_header_is_found_in_distro_and_configured_paths(self):
         for layout in ("ubuntu", "prefix-data", "prefix-parent"):
             with self.subTest(layout=layout):
