@@ -9,14 +9,15 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import FloatObject, NameObject
 from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QAction, QMouseEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLineEdit
 
 from pdf_workbench.annotations import PageAnnotation, TextStyle, load_image_asset
-from pdf_workbench.core import Workspace, load_source
+from pdf_workbench.core import Workspace, export_pdf, load_source
 from pdf_workbench.ui.preview import Preview
 from pdf_workbench.ui.rendering import RenderBroker
 from test_annotation_objects import image_bytes
@@ -195,6 +196,59 @@ class ObjectInteractionTests(unittest.TestCase):
         self.assertEqual(self.updated,[])
         QTest.mouseDClick(self.preview.canvas,Qt.MouseButton.LeftButton,pos=center.toPoint())
         self.assertEqual(self.edits[-1][1].kind,'cross')
+
+    def test_arrow_nudges_are_physical_points_for_nondefault_user_units_and_all_rotations(self):
+        # Measure the actual saved annotation Rect in PDF user space, then apply
+        # the saved page UserUnit and clockwise /Rotate. QtPdf's pointSize alone
+        # omits UserUnit and cannot be used as the physical-distance oracle.
+        keys=((Qt.Key.Key_Right,1,0),(Qt.Key.Key_Left,-1,0),
+              (Qt.Key.Key_Down,0,1),(Qt.Key.Key_Up,0,-1))
+        for unit in (2,.75):
+            writer=PdfWriter();page=writer.add_blank_page(width=340,height=460)
+            page.cropbox.lower_left=(30,40);page.cropbox.upper_right=(310,420)
+            page[NameObject("/UserUnit")]=FloatObject(unit)
+            source_path=self.directory/f"physical-source-{unit}.pdf"
+            writer.write(source_path);source_bytes=source_path.read_bytes()
+            self.source=load_source(source_path)
+            for rotation in (0,90,180,270):
+                self.workspace=Workspace();self.workspace.add_sources([self.source])
+                original=PageAnnotation('physical','cross',(.3,.3,.55,.55))
+                self.workspace.pages[0]=replace(self.workspace.pages[0],rotation=rotation,annotations=(original,))
+                self.refresh();self.preview.set_tool('select')
+                self.assertEqual(self.preview.user_unit,unit)
+                before_path=self.directory/f"before-{unit}-{rotation}.pdf"
+                export_pdf(self.workspace.sources,self.workspace.pages,before_path)
+                before_page=PdfReader(before_path).pages[0]
+                before_rect=before_page['/Annots'][0].get_object()['/Rect']
+                for step,modifiers in ((1,Qt.KeyboardModifier.NoModifier),(10,Qt.KeyboardModifier.ShiftModifier)):
+                    for key,x_direction,y_direction in keys:
+                        with self.subTest(user_unit=unit,rotation=rotation,step=step,key=key):
+                            self.workspace.pages[0]=replace(self.workspace.pages[0],annotations=(original,))
+                            self.refresh();self.preview.set_selected_annotation(original.uid)
+                            self.preview.canvas.setFocus()
+                            commits,undo_count=len(self.updated),len(self.workspace._undo)
+                            QTest.keyClick(self.preview.canvas,key,modifiers)
+                            self.assertEqual(len(self.updated),commits+1)
+                            self.assertEqual(len(self.workspace._undo),undo_count+1)
+                            after_path=self.directory/f"after-{unit}-{rotation}-{step}-{key.value}.pdf"
+                            export_pdf(self.workspace.sources,self.workspace.pages,after_path)
+                            after_page=PdfReader(after_path).pages[0]
+                            self.assertEqual(float(after_page['/UserUnit']),unit)
+                            self.assertEqual(after_page.rotation,rotation)
+                            after_rect=after_page['/Annots'][0].get_object()['/Rect']
+                            # Rect coordinates are PDF's bottom-left default user
+                            # space. Convert their translation to displayed pt.
+                            dx=(float(after_rect[0])-float(before_rect[0]))*unit
+                            dy=(float(after_rect[1])-float(before_rect[1]))*unit
+                            displayed={0:(dx,-dy),90:(dy,dx),180:(-dx,dy),270:(-dy,-dx)}[rotation]
+                            self.assertAlmostEqual(displayed[0],x_direction*step,places=5)
+                            self.assertAlmostEqual(displayed[1],y_direction*step,places=5)
+                            for low,high in ((0,2),(1,3)):
+                                self.assertAlmostEqual(float(after_rect[high])-float(after_rect[low]),
+                                                       float(before_rect[high])-float(before_rect[low]),places=5)
+                            self.workspace.undo()
+                            self.assertEqual(self.workspace.pages[0].annotations[0],original)
+                self.assertEqual(source_path.read_bytes(),source_bytes)
 
     def test_each_new_tool_emits_placement_request_without_mutating_workspace(self):
         initial=tuple(self.workspace.pages)

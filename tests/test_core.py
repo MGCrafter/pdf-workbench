@@ -156,15 +156,16 @@ class CoreTests(unittest.TestCase):
     def test_cancel_during_fallback_does_not_delete_a_replaced_destination(self):
         target = self.directory / 'replacement.pdf'
         moved = self.directory / 'moved-partial.pdf'
-        def cancel():
-            if target.exists():
+        def progress(value, message):
+            # At 100% the output handle is closed on both POSIX and Windows.
+            # A callback can fail after another application replaces that file.
+            if value == 100:
                 target.rename(moved)
                 target.write_bytes(b'foreign replacement')
-                return True
-            return False
+                raise OperationCancelled('Vorgang abgebrochen.')
         with patch('pdf_workbench.core.os.link', side_effect=OSError('unsupported')):
             with self.assertRaisesRegex(OperationCancelled, 'fremde Datei bleibt erhalten'):
-                self.export(path=target, cancel=cancel)
+                self.export(path=target, progress=progress)
         self.assertEqual(target.read_bytes(), b'foreign replacement')
         self.assertTrue(moved.exists())
         self.assertEqual(self.a.read_bytes(), self.original_a)

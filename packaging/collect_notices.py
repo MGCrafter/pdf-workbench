@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from concurrent.futures import ThreadPoolExecutor
 from email.parser import Parser
 import hashlib
 from importlib import metadata
@@ -304,55 +305,62 @@ def native_source_inventory(toc: Path) -> dict:
             "packages": [packages[key] for key in sorted(packages)], "exclusions": exclusions}
 
 
-def ubuntu_source_archives(inventory: dict) -> list[dict]:
-    """Resolve exact Ubuntu sources through the official Launchpad archive API.
+def _ubuntu_package_sources(package: dict) -> list[dict]:
+    name, version = package["source_package"], package["source_version"]
+    query = urllib.parse.urlencode({"ws.op": "getPublishedSources", "source_name": name,
+                                    "version": version, "exact_match": "true"})
+    publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query))
+    publication = next((item for item in publications.get("entries", []) if
+                        item["source_package_name"] == name and item["source_package_version"] == version), None)
+    if not publication:
+        raise IncompleteNotices(f"Exact Ubuntu source publication unavailable: {name} {version}")
+    urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls"))
+    by_name = {urllib.parse.unquote(urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]): url for url in urls}
+    dsc_names = [filename for filename in by_name if filename.endswith(".dsc")]
+    if len(dsc_names) != 1:
+        raise IncompleteNotices(f"No unique Ubuntu source descriptor for {name} {version}")
+    dsc_name = dsc_names[0]
+    data = fetch(by_name[dsc_name])
+    text = data.decode("utf-8")
+    if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
+        text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
+    control = Parser().parsestr(text)
+    if control.get("Source") != name or control.get("Version") != version:
+        raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
+    records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
+                "url": by_name[dsc_name], "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
+                "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
+    checksums = control.get("Checksums-Sha256", "").strip().splitlines()
+    if not checksums:
+        raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
+    for line in checksums:
+        digest, size, filename = line.split()
+        if not re.fullmatch(r"[0-9a-f]{64}", digest) or filename not in by_name:
+            raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
+        records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
+                        "url": by_name[filename], "sha256": digest, "size": int(size),
+                        "digest_source": by_name[dsc_name]})
+    return records
 
-    The small canonical .dsc binds every upstream/debian source tarball to an
-    upstream-provided SHA-256. Superseded security updates remain queryable.
+
+def ubuntu_source_archives(inventory: dict) -> list[dict]:
+    """Resolve exact Ubuntu sources in a bounded pool; validate every descriptor.
+
+    Only independent metadata/descriptor reads overlap. Deterministic filename
+    collision checks and publication of the final manifest remain serial.
     """
     if inventory.get("schema_version") != 1:
         raise IncompleteNotices("Unsupported native source inventory")
     archives = {}
-    for package in inventory["packages"]:
-        name, version = package["source_package"], package["source_version"]
-        query = urllib.parse.urlencode({"ws.op": "getPublishedSources", "source_name": name,
-                                        "version": version, "exact_match": "true"})
-        publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query))
-        publication = next((item for item in publications.get("entries", []) if
-                            item["source_package_name"] == name and item["source_package_version"] == version), None)
-        if not publication:
-            raise IncompleteNotices(f"Exact Ubuntu source publication unavailable: {name} {version}")
-        urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls"))
-        by_name = {urllib.parse.unquote(urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]): url for url in urls}
-        dsc_names = [filename for filename in by_name if filename.endswith(".dsc")]
-        if len(dsc_names) != 1:
-            raise IncompleteNotices(f"No unique Ubuntu source descriptor for {name} {version}")
-        dsc_name = dsc_names[0]
-        data = fetch(by_name[dsc_name])
-        text = data.decode("utf-8")
-        if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
-            text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
-        control = Parser().parsestr(text)
-        if control.get("Source") != name or control.get("Version") != version:
-            raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
-        records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
-                    "url": by_name[dsc_name], "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
-                    "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
-        checksums = control.get("Checksums-Sha256", "").strip().splitlines()
-        if not checksums:
-            raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
-        for line in checksums:
-            digest, size, filename = line.split()
-            if not re.fullmatch(r"[0-9a-f]{64}", digest) or filename not in by_name:
-                raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
-            records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
-                            "url": by_name[filename], "sha256": digest, "size": int(size),
-                            "digest_source": by_name[dsc_name]})
-        for item in records:
-            previous = archives.get(item["filename"])
-            if previous and previous["sha256"] != item["sha256"]:
-                raise IncompleteNotices("Conflicting Ubuntu source archive filenames")
-            archives[item["filename"]] = item
+    packages = inventory["packages"]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for index, records in enumerate(pool.map(_ubuntu_package_sources, packages), 1):
+            for item in records:
+                previous = archives.get(item["filename"])
+                if previous and previous["sha256"] != item["sha256"]:
+                    raise IncompleteNotices("Conflicting Ubuntu source archive filenames")
+                archives[item["filename"]] = item
+            print(f"Ubuntu source metadata {index}/{len(packages)}: {packages[index-1]['source_package']}", flush=True)
     return [archives[key] for key in sorted(archives)]
 
 

@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.1
+
+- Tesseract-Versionen mit `v` vor der Versionsnummer werden unter Windows erkannt.
+- Plattformtests berücksichtigen Dateisperren und Windows-Pfadaliase.
+- Die Abnahme der Ubuntu-Bibliotheksquellen fragt unabhängige Metadaten parallel
+  ab und zeigt den Fortschritt; dieselben Versions- und Prüfsummenkontrollen gelten weiter.
+
 ## 0.5.0
 
 Eigene Inhalte ergänzen und direkt auf der Seite bearbeiten:

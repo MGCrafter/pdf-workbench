@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -133,6 +134,33 @@ class ReleaseNoticeTests(unittest.TestCase):
         for response in (self.native_api('Source: demo\nVersion: 1.3-newer\n'), self.native_api(include_original=False)):
             with patch.object(notices, 'fetch', side_effect=response), self.assertRaises(notices.IncompleteNotices):
                 notices.ubuntu_source_archives(inventory)
+
+    def test_parallel_source_metadata_remains_complete_and_rejects_one_bad_descriptor(self):
+        packages = [{'source_package': name, 'source_version': '1.0'} for name in ('alpha', 'beta')]
+        for wrong in (False, True):
+            barrier = threading.Barrier(2)
+            def response(url, **kwargs):
+                parsed = notices.urllib.parse.urlparse(url)
+                query = notices.urllib.parse.parse_qs(parsed.query)
+                if 'getPublishedSources' in url:
+                    name = query['source_name'][0]
+                    barrier.wait(timeout=5)
+                    return json.dumps({'entries': [{'source_package_name': name, 'source_package_version': '1.0',
+                                                    'self_link': 'https://api.launchpad.net/' + name}]}).encode()
+                if 'sourceFileUrls' in url:
+                    name = parsed.path.rsplit('/', 1)[-1]
+                    return json.dumps([f'https://launchpad.net/{name}_1.0.dsc', f'https://launchpad.net/{name}_1.0.orig.tar.xz']).encode()
+                name = parsed.path.rsplit('/', 1)[-1].split('_', 1)[0]
+                version = '2.0' if wrong and name == 'beta' else '1.0'
+                return (f'Source: {name}\nVersion: {version}\nChecksums-Sha256:\n ' + 'a'*64 + f' 123 {name}_1.0.orig.tar.xz\n').encode()
+            with patch.object(notices, 'fetch', side_effect=response):
+                if wrong:
+                    with self.assertRaises(notices.IncompleteNotices):
+                        notices.ubuntu_source_archives({'schema_version': 1, 'packages': packages})
+                else:
+                    result = notices.ubuntu_source_archives({'schema_version': 1, 'packages': packages})
+                    self.assertEqual(len(result), 4)
+                    self.assertEqual({item['component'] for item in result}, {'Ubuntu source: alpha', 'Ubuntu source: beta'})
 
     def test_native_toc_uses_actual_elf_inputs_and_exact_dpkg_source_version(self):
         library = self.directory / 'libdemo.so.1'

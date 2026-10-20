@@ -441,7 +441,7 @@ def discover_engine(executable=None, cache_dir=None, *, cancel=None) -> OcrEngin
         raise OcrError("Die gewählte Tesseract-Programmdatei wurde nicht gefunden.")
     try:
         version = _capture_tool([str(path), "--version"], cancel)[0].splitlines()[0]
-        version_match = re.match(r"tesseract (\d+)\.(\d+)", version)
+        version_match = re.match(r"tesseract v?(\d+)\.(\d+)", version)
         if not version_match or tuple(map(int, version_match.groups())) < (4, 1):
             raise OcrError("Bitte Tesseract 4.1 oder neuer verwenden.")
         result = _capture_tool([str(path), "--list-langs"], cancel)

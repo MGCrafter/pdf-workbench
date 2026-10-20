@@ -8,10 +8,10 @@ lokal, ohne Konto und ohne Upload deiner Dokumente.
 
 ## Download
 
-| System | Download für v0.5.0 |
+| System | Download für v0.5.1 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.0/PDFWorkbench-v0.5.0-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.0/PDFWorkbench-v0.5.0-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.1/PDFWorkbench-v0.5.1-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.1/PDFWorkbench-v0.5.1-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -24,7 +24,7 @@ bleiben.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.5.0-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.5.1-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```

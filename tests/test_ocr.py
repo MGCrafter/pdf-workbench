@@ -46,7 +46,7 @@ def wait_for(predicate, seconds=10):
 
 class OcrSafetyTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name)
+        self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name).resolve()
 
     def tearDown(self): self.temp.cleanup()
 
@@ -95,34 +95,107 @@ class OcrSafetyTests(unittest.TestCase):
                 original = directory/"owned-file-retained"
                 replacement = b"another writer's replacement"
                 changed = []
+                def replace(path):
+                    try:
+                        path.rename(original)
+                    except PermissionError:
+                        if os.name != "nt": raise
+                        # Windows denies renaming this open descriptor. Cancel
+                        # must then remove our own incomplete file normally.
+                        changed.append((path, False))
+                    else:
+                        path.write_bytes(replacement); changed.append((path, True))
                 def cancel():
                     if replaced == "target" and target.exists() and not changed:
-                        target.rename(original); target.write_bytes(replacement); changed.append(target)
+                        replace(target)
                     return bool(changed)
                 def progress(*_):
                     if replaced == "temporary" and not changed:
                         temporary = next(directory.glob(".eng-*.partial"))
-                        temporary.rename(original); temporary.write_bytes(replacement); changed.append(temporary)
+                        replace(temporary)
                 with patch.dict(ocr.LANGUAGE_PACKS, lock, clear=True), patch.object(ocr.urllib.request,"urlopen",return_value=io.BytesIO(data)), patch.object(ocr.os,"link",side_effect=OSError(errno.EOPNOTSUPP,"no hardlinks")):
                     with self.assertRaises(OperationCancelled):
                         ocr.download_language("eng",directory,cancel,progress)
-                self.assertTrue(original.exists())
-                self.assertEqual(changed[0].read_bytes(),replacement)
+                path, was_replaced = changed[0]
+                if was_replaced:
+                    self.assertTrue(original.exists())
+                    self.assertEqual(path.read_bytes(),replacement)
+                else:
+                    self.assertEqual(os.name,"nt")
+                    self.assertFalse(original.exists())
+                    self.assertFalse(path.exists())
+
+    def test_modeled_replacement_during_cancel_is_preserved_on_every_platform(self):
+        # Some Windows opens forbid rename. Model the changed directory entry
+        # as well, so the replacement-identity guard is exercised there too.
+        data = b"expected model bytes"
+        lock = {"eng": {"name": "Englisch", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}}
+        real_lstat = Path.lstat
+        for replaced in ("target", "temporary"):
+            with self.subTest(replaced=replaced):
+                directory = self.root/replaced; directory.mkdir()
+                target = directory/"eng.traineddata"
+                changed = []
+                def namespace_status(path,*args,**kwargs):
+                    status = real_lstat(path,*args,**kwargs)
+                    if changed and path == changed[0]:
+                        return types.SimpleNamespace(st_dev=status.st_dev,st_ino=status.st_ino+1,st_mode=status.st_mode)
+                    return status
+                def cancel():
+                    if replaced == "target" and target.exists() and not changed:changed.append(target)
+                    return bool(changed)
+                def progress(*_):
+                    if replaced == "temporary" and not changed:changed.append(next(directory.glob(".eng-*.partial")))
+                with patch.dict(ocr.LANGUAGE_PACKS,lock,clear=True),patch.object(ocr.urllib.request,"urlopen",return_value=io.BytesIO(data)),patch.object(ocr.os,"link",side_effect=OSError(errno.EOPNOTSUPP,"no hardlinks")),patch.object(Path,"lstat",namespace_status):
+                    with self.assertRaises(OperationCancelled):ocr.download_language("eng",directory,cancel,progress)
+                self.assertTrue(changed[0].is_file())
 
     def test_notice_write_failure_preserves_a_concurrent_replacement(self):
         target = self.root/"tessdata_fast-LICENSE"
         retained = self.root/"owned-license-retained"
         replacement = b"another writer's license note"
         real_fsync = os.fsync
+        renamed = []
         def fail_after_replacement(descriptor):
             if target.exists():
-                target.rename(retained); target.write_bytes(replacement)
+                try:
+                    target.rename(retained)
+                except PermissionError:
+                    if os.name != "nt": raise
+                    renamed.append(False)
+                else:
+                    target.write_bytes(replacement); renamed.append(True)
                 raise OSError("simulated write failure")
             real_fsync(descriptor)
         with patch.object(ocr.os,"link",side_effect=OSError(errno.EOPNOTSUPP,"no hardlinks")),patch.object(ocr.os,"fsync",side_effect=fail_after_replacement):
             with self.assertRaises(OSError):ocr._install_model_notices(self.root)
-        self.assertEqual(target.read_bytes(),replacement)
-        self.assertEqual(retained.read_bytes(),ocr.TESSDATA_LICENSE_TEXT.encode())
+        if renamed[0]:
+            self.assertEqual(target.read_bytes(),replacement)
+            self.assertEqual(retained.read_bytes(),ocr.TESSDATA_LICENSE_TEXT.encode())
+        else:
+            self.assertEqual(os.name,"nt")
+            self.assertFalse(target.exists())
+            self.assertFalse(retained.exists())
+        self.assertEqual(list(self.root.glob("*.partial")),[])
+
+    def test_modeled_notice_replacement_survives_a_failed_write_on_every_platform(self):
+        target = self.root/"tessdata_fast-LICENSE"
+        real_fsync,real_lstat = os.fsync,Path.lstat
+        changed = []
+        def namespace_status(path,*args,**kwargs):
+            status = real_lstat(path,*args,**kwargs)
+            if changed and path == target:
+                return types.SimpleNamespace(st_dev=status.st_dev,st_ino=status.st_ino+1,st_mode=status.st_mode)
+            return status
+        def fail_after_replacement(descriptor):
+            if target.exists():
+                changed.append(True)
+                raise OSError("simulated write failure after namespace replacement")
+            real_fsync(descriptor)
+        with patch.object(ocr.os,"link",side_effect=OSError(errno.EOPNOTSUPP,"no hardlinks")),patch.object(ocr.os,"fsync",side_effect=fail_after_replacement),patch.object(Path,"lstat",namespace_status):
+            with self.assertRaises(OSError):ocr._install_model_notices(self.root)
+        self.assertTrue(changed)
+        self.assertTrue(target.is_file())
         self.assertEqual(list(self.root.glob("*.partial")),[])
 
     def test_cleanup_requires_a_regular_file_with_a_usable_identity(self):
@@ -232,8 +305,24 @@ class OcrSafetyTests(unittest.TestCase):
         for version in ("4.1.1", "5.5.3", "10.0.0"):
             with self.subTest(version=version), patch.object(ocr,"_capture_tool",side_effect=[(f"tesseract {version}\n", ""),("eng\n", "")]):
                 self.assertEqual(ocr.discover_engine(executable,self.root).version,f"tesseract {version}")
-        with patch.object(ocr,"_capture_tool",return_value=("tesseract 4.0.0\n", "")),self.assertRaises(ocr.OcrError):
-            ocr.discover_engine(executable,self.root)
+        for version in ("4.0.0","v4.0.0"):
+            with self.subTest(version=version),patch.object(ocr,"_capture_tool",return_value=(f"tesseract {version}\n", "")),self.assertRaises(ocr.OcrError):
+                ocr.discover_engine(executable,self.root)
+
+    def test_real_ub_mannheim_version_prefix_and_portable_data_directory_are_accepted(self):
+        executable = self.root/"Tesseract-OCR/tesseract.exe"
+        executable.parent.mkdir();executable.write_bytes(b"engine fixture")
+        data = executable.parent/"tessdata";data.mkdir()
+        font = data/"pdf.ttf";font.write_bytes(b"PDF font fixture")
+        model = data/"eng.traineddata";model.write_bytes(b"system language fixture")
+        responses = [("tesseract v5.4.0.20240606\n leptonica-1.84.1\n", ""),(f'List of available languages in "{data}" (1):\neng\n', "")]
+        with patch.object(ocr,"_capture_tool",side_effect=responses):
+            engine = ocr.discover_engine(executable,self.root/"empty-cache")
+        self.assertEqual(engine.version,"tesseract v5.4.0.20240606")
+        self.assertEqual(engine.executable,executable)
+        self.assertEqual(engine.tessdata_dir,data)
+        self.assertEqual(engine.pdf_font,font)
+        self.assertEqual(ocr._language_files(engine,("eng",),self.root/"empty-cache"),{"eng":model})
 
     def test_4_1_data_without_a_directory_header_is_found_in_distro_and_configured_paths(self):
         for layout in ("ubuntu", "prefix-data", "prefix-parent"):
@@ -290,7 +379,7 @@ class RealTesseractTests(unittest.TestCase):
             raise unittest.SkipTest("Optional Tesseract with English and pdf.ttf is not installed; no download is started by tests.")
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name)
+        self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name).resolve()
         image = QImage(1800, 500, QImage.Format.Format_RGB32); image.fill(Qt.GlobalColor.white)
         painter = QPainter(image); painter.setPen(QColor("#152840")); painter.setFont(QFont("DejaVu Sans", 68))
         painter.drawText(60, 175, "LOCAL OCR TEST 123")
