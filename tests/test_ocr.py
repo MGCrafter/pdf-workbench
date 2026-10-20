@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QCoreApplication, QEvent, QSettings, QThread, Qt
+from PyQt6 import sip
 from PyQt6.QtGui import QColor, QFont, QImage, QPainter
 from PyQt6.QtWidgets import QApplication, QDialogButtonBox
 from pypdf import PdfReader, PdfWriter, Transformation
@@ -368,6 +369,54 @@ class OcrSafetyTests(unittest.TestCase):
         pdf=canvas.Canvas(str(path));pdf.drawString(30,100,"Visible text is not an OCR layer");pdf.save()
         with self.assertRaises(ocr.OcrError): ocr._text_only_page(path)
 
+    def test_pdf_document_is_destroyed_before_staging_cleanup_on_success_cancel_and_error(self):
+        from PyQt6 import QtPdf
+        document_class = QtPdf.QPdfDocument
+        directory_class = tempfile.TemporaryDirectory
+        source = self.root/"original.pdf"
+        pdf = canvas.Canvas(str(source),pagesize=(300,200));pdf.rect(30,30,100,60);pdf.save()
+        original = source.read_bytes()
+        workspace = Workspace();workspace.add_sources([load_source(source)])
+        data = self.root/"tessdata";data.mkdir()
+        (data/"eng.traineddata").write_bytes(b"system language fixture")
+        font = data/"pdf.ttf";font.write_bytes(b"PDF font fixture")
+        engine = ocr.OcrEngine(self.root/"tesseract","tesseract v5.4.0.20240606",data,font,("eng",))
+        for outcome in ("success","cancel","error"):
+            with self.subTest(outcome=outcome):
+                documents = []
+                cleanup_checks = []
+                test_case = self
+                class TrackedDocument(document_class):
+                    def __init__(self,*args):
+                        super().__init__(*args);documents.append(self)
+                class CheckedDirectory(directory_class):
+                    def __exit__(self,*args):
+                        try:
+                            test_case.assertEqual(len(documents),1)
+                            test_case.assertTrue(sip.isdeleted(documents[0]),"Qt PDF still owns its file device when staging cleanup starts")
+                            cleanup_checks.append(True)
+                        finally:
+                            super().__exit__(*args)
+                def recognize(_engine,_image,output,*_args):
+                    if outcome == "cancel":raise OperationCancelled("cancel during recognition")
+                    if outcome == "error":raise ocr.OcrError("recognition failed")
+                    layer = canvas.Canvas(str(output.with_suffix(".pdf")),pagesize=(300,200))
+                    text = layer.beginText(30,100);text.setTextRenderMode(3);text.textLine("SEARCHABLE")
+                    layer.drawText(text);layer.save()
+                target = self.root/(outcome+".pdf")
+                with patch.object(QtPdf,"QPdfDocument",TrackedDocument),patch.object(ocr.tempfile,"TemporaryDirectory",CheckedDirectory),patch.object(ocr,"_run_tesseract",side_effect=recognize):
+                    if outcome == "success":
+                        result = ocr.export_searchable_pdf(workspace.sources,workspace.pages,target,engine=engine,languages=("eng",),cache_dir=self.root/"empty-cache",dpi=72)
+                        self.assertEqual(result.processed_pages,1)
+                        self.assertIn("SEARCHABLE",PdfReader(target).pages[0].extract_text())
+                    else:
+                        with self.assertRaises(OperationCancelled if outcome == "cancel" else ocr.OcrError):
+                            ocr.export_searchable_pdf(workspace.sources,workspace.pages,target,engine=engine,languages=("eng",),cache_dir=self.root/"empty-cache",dpi=72)
+                        self.assertFalse(target.exists())
+                self.assertEqual(cleanup_checks,[True])
+                self.assertEqual(source.read_bytes(),original)
+                self.assertFalse(list(self.root.glob(".pdf-workbench-ocr-*")))
+
     def test_canceling_a_language_download_closes_only_after_the_worker_stops(self):
         settings=QSettings(str(self.root/"ocr.ini"),QSettings.Format.IniFormat)
         started=threading.Event()
@@ -532,7 +581,7 @@ class RealTesseractTests(unittest.TestCase):
                         actual=(bounds.left()/size.width(),bounds.top()/size.height(),bounds.right()/size.width(),bounds.bottom()/size.height())
                         if expected is None: expected=actual
                         for value,reference in zip(actual,expected): self.assertAlmostEqual(value,reference,delta=.015)
-                    finally: document.close()
+                    finally: document.close();sip.delete(document)
 
 
 if __name__ == "__main__": unittest.main(verbosity=2)

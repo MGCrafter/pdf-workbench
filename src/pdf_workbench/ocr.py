@@ -642,6 +642,7 @@ def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence
     engine = engine or discover_engine(cache_dir=cache)
     if engine is None: raise OcrError("Tesseract wurde nicht gefunden. Bitte zuerst eine lokale Installation auswählen.")
     language_files = _language_files(engine, languages, cache)
+    from PyQt6 import sip
     from PyQt6.QtCore import QSize
     from PyQt6.QtGui import QGuiApplication
     from PyQt6.QtPdf import QPdfDocument, QPdfDocumentRenderOptions
@@ -692,4 +693,9 @@ def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence
                                 lambda value, message: progress(85+value*15//100, message) if progress else None)
             return OcrResult(result, processed, skipped)
         finally:
-            document.close()
+            try:
+                document.close()
+            finally:
+                # Qt keeps its QFile device alive after close(). Destroy it
+                # synchronously before TemporaryDirectory removes the PDF.
+                sip.delete(document)

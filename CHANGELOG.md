@@ -1,5 +1,12 @@
 # Änderungen
 
+## 0.5.3
+
+- Die Texterkennung gibt temporäre PDF-Dateien vor dem Aufräumen vollständig
+  frei. Das verhindert Dateisperren beim OCR-Export unter Windows.
+- Vorübergehende Serverfehler beim Erstellen der Release-Pakete werden begrenzt
+  erneut versucht. Versions-, Größen- und Prüfsummenkontrollen bleiben verbindlich.
+
 ## 0.5.2
 
 - Windows-Sprachlisten mit CRLF-Zeilenenden werden korrekt gelesen.

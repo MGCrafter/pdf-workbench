@@ -9,6 +9,9 @@ import argparse
 import ast
 from concurrent.futures import ThreadPoolExecutor
 from email.parser import Parser
+from email.utils import parsedate_to_datetime
+import errno
+import http.client
 import hashlib
 from importlib import metadata
 import json
@@ -16,10 +19,13 @@ from pathlib import Path, PurePosixPath
 import platform
 import re
 import shutil
+import socket
 import ssl
 import subprocess
 import sys
 import sysconfig
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -55,15 +61,94 @@ def safe_relative(value: str) -> Path:
     return Path(*pure.parts)
 
 
+# Keep the build bounded even when an upstream service is overloaded. Each
+# attempt still enforces HTTPS and all callers' size, version and hash gates.
+NETWORK_ATTEMPTS = 5
+RETRYABLE_HTTP_STATUS = frozenset((429, 500, 502, 503, 504))
+MAX_RETRY_DELAY = 30
+NETWORK_ERRNOS = frozenset(getattr(errno,name) for name in (
+    "ETIMEDOUT", "ECONNRESET", "ECONNABORTED", "ECONNREFUSED", "EPIPE",
+    "ENETRESET", "ENETDOWN", "ENETUNREACH", "EHOSTUNREACH", "EHOSTDOWN") if hasattr(errno,name))
+
+
+def _temporary_network_error(error: Exception) -> bool:
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in RETRYABLE_HTTP_STATUS
+    if isinstance(error, urllib.error.URLError):
+        error = error.reason
+    if isinstance(error, ssl.SSLCertVerificationError):
+        return False
+    if isinstance(error, socket.gaierror):
+        return error.errno == socket.EAI_AGAIN  # Not permanent unknown-host errors.
+    if isinstance(error, (TimeoutError, ConnectionError, http.client.IncompleteRead,
+                          ssl.SSLEOFError, ssl.SSLZeroReturnError)):
+        return True
+    return isinstance(error, OSError) and error.errno in NETWORK_ERRNOS
+
+
+def _retry_delay(error: Exception, attempt: int) -> float:
+    delay = 2 ** attempt  # 2, 4, 8, 16 seconds between the five attempts.
+    if isinstance(error, urllib.error.HTTPError) and error.headers:
+        value = error.headers.get("Retry-After", "").strip()
+        try:
+            if re.fullmatch(r"[0-9]+",value):
+                requested = int(value)
+            else:
+                date = parsedate_to_datetime(value)
+                requested = date.timestamp()-time.time() if date.tzinfo else 0
+            delay = max(delay,requested)
+        except (ValueError,TypeError,OverflowError):
+            pass
+    return min(MAX_RETRY_DELAY,delay)
+
+
+def _network_retry(url: str, operation):
+    """Retry only transient transport failures; validation exceptions escape."""
+    for attempt in range(1,NETWORK_ATTEMPTS+1):
+        try:
+            return operation()
+        except Exception as error:
+            retryable = _temporary_network_error(error)
+            delay = _retry_delay(error,attempt) if retryable else 0
+            if isinstance(error,urllib.error.HTTPError):
+                error.close()  # Release the failed response before waiting/reopening.
+            if not retryable:
+                if isinstance(error,(urllib.error.URLError,ssl.SSLError,socket.gaierror,http.client.HTTPException)):
+                    raise IncompleteNotices(f"Upstream request failed for {url}: {type(error).__name__}: {error}") from error
+                raise
+            if attempt == NETWORK_ATTEMPTS:
+                raise IncompleteNotices(f"Temporary upstream failure after {NETWORK_ATTEMPTS} attempts for {url}: {type(error).__name__}: {error}") from error
+            print(f"Temporary upstream failure ({type(error).__name__}: {error}); retry {attempt}/{NETWORK_ATTEMPTS-1} in {delay:g}s: {url}",file=sys.stderr,flush=True)
+            time.sleep(delay)
+
+
+def _response_length(response) -> int | None:
+    headers = getattr(response,"headers",None)
+    value = headers.get("Content-Length") if headers is not None else None
+    if value is None:
+        return None
+    if not re.fullmatch(r"[0-9]+",value.strip()):
+        raise IncompleteNotices("Invalid upstream Content-Length")
+    return int(value)
+
+
 def fetch(url: str, limit: int = 16 * 1024 * 1024) -> bytes:
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme != "https":
         raise IncompleteNotices(f"Source URL must use HTTPS: {url}")
-    request = urllib.request.Request(url, headers={"User-Agent": "PDFWorkbench-release-notices/1"})
-    with urllib.request.urlopen(request, timeout=90) as response:
-        if urllib.parse.urlparse(response.url).scheme != "https":
-            raise IncompleteNotices("Refusing insecure upstream redirect")
-        data = response.read(limit + 1)
+    def read_once():
+        request = urllib.request.Request(url, headers={"User-Agent": "PDFWorkbench-release-notices/1"})
+        with urllib.request.urlopen(request, timeout=90) as response:
+            if urllib.parse.urlparse(response.url).scheme != "https":
+                raise IncompleteNotices("Refusing insecure upstream redirect")
+            length = _response_length(response)
+            if length is not None and length > limit:
+                raise IncompleteNotices(f"Missing or unexpectedly large notice/metadata: {url}")
+            data = response.read(limit + 1)
+            if length is not None and len(data) < length:
+                raise http.client.IncompleteRead(data,length-len(data))
+        return data
+    data = _network_retry(url,read_once)
     if not data or len(data) > limit:
         raise IncompleteNotices(f"Missing or unexpectedly large notice/metadata: {url}")
     return data
@@ -372,33 +457,50 @@ def download_sources(items: list[dict], destination: Path) -> None:
         if safe_relative(filename).name != filename:
             raise IncompleteNotices("Source archive must be a plain filename")
         path = destination / filename
+        temporary = destination / (filename + ".partial")
+        temporary.unlink(missing_ok=True)
         expected = item["sha256"]
         if path.exists() and expected and sha256(path) == expected:
             continue
         if urllib.parse.urlparse(item["url"]).scheme != "https":
             raise IncompleteNotices("Source archive URL must use HTTPS")
-        request = urllib.request.Request(item["url"], headers={"User-Agent": "PDFWorkbench-source-archive/1"})
-        temporary = destination / (filename + ".partial")
-        digest = hashlib.sha256()
-        size = 0
-        with urllib.request.urlopen(request, timeout=180) as response, temporary.open("wb") as stream:
-            if urllib.parse.urlparse(response.url).scheme != "https":
-                raise IncompleteNotices("Refusing insecure source redirect")
-            while chunk := response.read(1024 * 1024):
-                size += len(chunk)
-                if size > 2 * 1024 * 1024 * 1024:
-                    raise IncompleteNotices("Source archive exceeds the release asset limit")
-                digest.update(chunk)
-                stream.write(chunk)
-        actual = digest.hexdigest()
-        if expected and actual != expected:
+        def transfer_once():
+            # A previous interrupted attempt must contribute neither bytes nor
+            # digest state to this new request. Never resume unverified sources.
             temporary.unlink(missing_ok=True)
-            raise IncompleteNotices(f"Source digest mismatch: {filename}")
-        if item.get("size") and temporary.stat().st_size != item["size"]:
+            digest = hashlib.sha256()
+            size = 0
+            request = urllib.request.Request(item["url"], headers={"User-Agent": "PDFWorkbench-source-archive/1"})
+            try:
+                with urllib.request.urlopen(request, timeout=180) as response, temporary.open("wb") as stream:
+                    if urllib.parse.urlparse(response.url).scheme != "https":
+                        raise IncompleteNotices("Refusing insecure source redirect")
+                    length = _response_length(response)
+                    if length is not None and length > 2 * 1024 * 1024 * 1024:
+                        raise IncompleteNotices("Source archive exceeds the release asset limit")
+                    while chunk := response.read(1024 * 1024):
+                        size += len(chunk)
+                        if size > 2 * 1024 * 1024 * 1024:
+                            raise IncompleteNotices("Source archive exceeds the release asset limit")
+                        digest.update(chunk)
+                        stream.write(chunk)
+                    if length is not None and size < length:
+                        raise http.client.IncompleteRead(b"",length-size)
+                return digest.hexdigest(),size
+            except BaseException:
+                temporary.unlink(missing_ok=True)
+                raise
+        try:
+            actual,size = _network_retry(item["url"],transfer_once)
+            if expected and actual != expected:
+                raise IncompleteNotices(f"Source digest mismatch: {filename}")
+            if item.get("size") and size != item["size"]:
+                raise IncompleteNotices(f"Source size mismatch: {filename}")
+            temporary.replace(path)
+            item.update(sha256=actual, size=size)
+        finally:
             temporary.unlink(missing_ok=True)
-            raise IncompleteNotices(f"Source size mismatch: {filename}")
-        item.update(sha256=actual, size=temporary.stat().st_size)
-        temporary.replace(path)
+
     (destination / "source-manifest.json").write_text(json.dumps(items, indent=2) + "\n", encoding="utf-8")
 
 
