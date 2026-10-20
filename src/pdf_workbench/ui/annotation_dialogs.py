@@ -91,7 +91,7 @@ class AnnotationListDialog(QDialog):
         super().__init__(parent); self.setWindowTitle("Anmerkungen auf der aktuellen Seite"); self.resize(480, 330)
         self.annotations, self.edit_callback, self.remove_callback = annotations, edit, remove
         layout = QVBoxLayout(self)
-        hint = QLabel("Eigene Kommentare, Textmarkierungen und gezeichnete Unterschriften. Änderungen lassen sich im Hauptfenster rückgängig machen."); hint.setWordWrap(True); layout.addWidget(hint)
+        hint = QLabel("Eigene Anmerkungen und eingefügte Objekte. Änderungen lassen sich im Hauptfenster rückgängig machen."); hint.setWordWrap(True); layout.addWidget(hint)
         self.list = QListWidget(); self.list.setAccessibleName("Eigene Anmerkungen auf der aktuellen Seite"); layout.addWidget(self.list, 1)
         self.list.itemDoubleClicked.connect(lambda *_: self.edit())
         row = QHBoxLayout(); self.edit_button = QPushButton("Bearbeiten …"); self.remove_button = QPushButton("Löschen")
@@ -102,7 +102,7 @@ class AnnotationListDialog(QDialog):
 
     def refresh(self, uid=None):
         self.list.clear()
-        labels = {"comment": "Kommentar", "highlight": "Textmarkierung", "signature": "Gezeichnete Unterschrift"}
+        labels = {"comment": "Kommentar", "highlight": "Textmarkierung", "signature": "Gezeichnete Unterschrift", "text": "Textfeld", "image": "Bild", "stamp": "Stempel", "checkmark": "Häkchen", "cross": "Kreuz"}
         for annotation in self.annotations():
             text = annotation.text.replace("\n", " ")
             item = QListWidgetItem(labels[annotation.kind] + (": " + text[:100] if text else ""))

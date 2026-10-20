@@ -30,7 +30,8 @@ def build_provenance(release: bool) -> dict:
             raise ValueError('Commit source and packaging changes before a release build.')
     return {'schema_version': 1, 'app_version': version, 'source_commit': commit,
             'source_sha256': {path.relative_to(ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                              for path in sorted((ROOT / 'src').rglob('*.py'))}}
+                              for path in sorted((ROOT / 'src').rglob('*'))
+                              if path.is_file() and path.suffix in ('.py', '.ttf', '.txt')}}
 
 
 def verify_notices(directory: Path) -> dict:
@@ -83,6 +84,7 @@ def main():
         '--add-data', f'{ROOT / "LICENSE"}:.',
         '--add-data', f'{ROOT / "THIRD_PARTY_NOTICES.md"}:.',
         '--add-data', f'{provenance_path}:.',
+        '--add-data', f'{ROOT / "src/pdf_workbench/fonts"}:pdf_workbench/fonts',
         *notice_data, str(ROOT / 'packaging/entry.py'),
     ], cwd=ROOT, check=True)
     print(f'Build: {distpath / "PDFWorkbench"}')

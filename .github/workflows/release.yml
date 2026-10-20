@@ -44,7 +44,23 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+          sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+      - name: Prepare optional OCR engine for native Windows acceptance
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Pinned UB-Mannheim build, SHA-256 recorded in Microsoft's WinGet manifest.
+          # This engine is used by acceptance tests and is not added to the app bundle.
+          $installer = Join-Path $env:RUNNER_TEMP 'tesseract-5.4.0.20240606.exe'
+          Invoke-WebRequest -Uri 'https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe' -OutFile $installer
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne 'C885FFF6998E0608BA4BB8AB51436E1C6775C2BAFC2559A19B423E18678B60C9') { throw 'OCR installer checksum mismatch' }
+          $process = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'OCR acceptance engine setup failed' }
+          $engine = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'
+          if (-not (Test-Path -LiteralPath $engine)) { throw 'OCR acceptance engine is missing' }
+          & $engine --version
+          if ($LASTEXITCODE -ne 0) { throw 'OCR acceptance engine cannot run' }
+          (Split-Path -Parent $engine) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - run: python -m pip install -r packaging/requirements-release.txt
       - name: Check Linux Qt platform dependencies
         if: runner.os == 'Linux'
@@ -74,9 +90,12 @@ jobs:
         if: runner.os == 'Linux'
         env:
           QT_DEBUG_PLUGINS: '1'
+          PDF_WORKBENCH_REQUIRE_OCR: '1'
         run: xvfb-run -a dist/PDFWorkbench/PDFWorkbench --self-test --output build/frozen-smoke
       - name: Test the frozen Windows app
         if: runner.os == 'Windows'
+        env:
+          PDF_WORKBENCH_REQUIRE_OCR: '1'
         shell: pwsh
         run: |
           $app = (Resolve-Path dist/PDFWorkbench/PDFWorkbench.exe).Path

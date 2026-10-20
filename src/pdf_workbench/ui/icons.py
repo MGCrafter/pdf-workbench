@@ -96,6 +96,8 @@ class VectorIcon(QIconEngine):
         elif name == "signature":
             p.moveTo(2, 17); p.cubicTo(14, -2, 16, 1, 9, 15); p.cubicTo(4, 24, 14, 10, 14, 16); p.cubicTo(13, 22, 18, 9, 18, 16); p.lineTo(22, 15)
             p.moveTo(3, 22); p.lineTo(21, 22)
+        elif name == "select":
+            p.moveTo(4, 2); p.lineTo(4, 20); p.lineTo(9, 15); p.lineTo(13, 23); p.lineTo(17, 21); p.lineTo(13, 14); p.lineTo(21, 13); p.closeSubpath()
         elif name == "hand":
             p.moveTo(6, 13); p.lineTo(6, 6); p.cubicTo(6, 3, 9, 3, 9, 6); p.lineTo(9, 12); p.moveTo(9, 6); p.lineTo(9, 3); p.cubicTo(9, 1, 12, 1, 12, 3); p.lineTo(12, 11)
             p.moveTo(12, 5); p.cubicTo(12, 2, 15, 3, 15, 5); p.lineTo(15, 12); p.moveTo(15, 7); p.cubicTo(15, 4, 18, 5, 18, 7); p.lineTo(18, 16); p.cubicTo(18, 24, 8, 24, 6, 18); p.lineTo(3, 13); p.cubicTo(1, 10, 4, 8, 6, 13)

@@ -96,6 +96,23 @@ class ReleaseAcceptanceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verify()
 
+    def test_feature_release_cannot_reuse_only_a_dark_mode_acceptance(self):
+        self.version = self.provenance['app_version'] = '0.5.0'
+        theme = ['appearance dark/light/system', 'appearance persisted',
+                 'appearance preserves document and viewport', 'appearance document/export colors',
+                 'appearance dialogs and icons']
+        features = ['objects select/move/duplicate/delete/undo', 'objects text/image/stamp/symbol PDF roundtrip',
+                    'objects bundled font and Unicode', 'asynchronous text search', 'images to PDF and undo',
+                    'local OCR searchable text and preserved image']
+        report, _ = self.prepare()
+        for missing in features:
+            report['gui']['checks'] = theme + [name for name in features if name != missing]
+            self.write_report(report)
+            with self.subTest(missing=missing), self.assertRaises(ValueError): self.verify()
+        report['gui']['checks'] = theme + features
+        self.write_report(report)
+        self.assertEqual(self.verify(), report)
+
     def test_dark_mode_release_requires_all_native_appearance_checks(self):
         self.version = self.provenance['app_version'] = '0.4.0'
         required = ['appearance dark/light/system', 'appearance persisted',
@@ -217,6 +234,17 @@ class BuildProvenanceTests(unittest.TestCase):
         self.project_file.write_text('[project]\nversion = "0.4.0"\n', encoding="utf-8")
         with self.assertRaises(ValueError):
             build.build_provenance(release=True)
+
+    def test_bundled_font_and_license_are_bound_to_the_tested_source(self):
+        folder = self.source.parent / 'fonts'; folder.mkdir()
+        font = folder / 'font.ttf'; font.write_bytes(b'font fixture')
+        license = folder / 'OFL.txt'; license.write_text('license fixture')
+        font_key = 'src/pdf_workbench/fonts/font.ttf'
+        before = build.build_provenance(release=True)['source_sha256']
+        self.assertEqual(before[font_key], hashlib.sha256(font.read_bytes()).hexdigest())
+        self.assertIn('src/pdf_workbench/fonts/OFL.txt', before)
+        font.write_bytes(b'changed font')
+        self.assertNotEqual(build.build_provenance(release=True)['source_sha256'][font_key], before[font_key])
 
     def test_uncommitted_source_or_packaging_changes_cannot_build_a_release(self):
         for status in (" M src/pdf_workbench/app.py\n", "?? src/pdf_workbench/new.py\n",

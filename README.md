@@ -4,14 +4,14 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-![PDF Workbench mit drei Seiten, einer Textmarkierung, einem Kommentar und einer gezeichneten Unterschrift](docs/assets/screenshot.png)
+![PDF Workbench im Dark Mode mit Textfeldern, einem Bild, einem Stempel und Symbolen](docs/assets/screenshot.png)
 
 ## Download
 
-| System | Download für v0.4.0 |
+| System | Download für v0.5.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.4.0/PDFWorkbench-v0.4.0-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.4.0/PDFWorkbench-v0.4.0-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.0/PDFWorkbench-v0.5.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.0/PDFWorkbench-v0.5.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -24,7 +24,7 @@ bleiben.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.4.0-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.5.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
@@ -40,6 +40,10 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Eine Auswahl gemeinsam oder jede ausgewählte Seite einzeln speichern.
 - Kommentare und Textmarkierungen hinzufügen, bearbeiten und löschen.
 - Eine Unterschrift zeichnen und auf der Seite platzieren.
+- Eigene Textfelder, Bilder, Stempel, Häkchen und Kreuze einfügen.
+- Objekte auswählen, verschieben, vergrößern, kopieren und wieder bearbeiten.
+- Nach Text suchen und PNG-/JPEG-Bilder in PDF-Seiten umwandeln.
+- Scans mit optionalem Tesseract lokal durchsuchbar machen.
 - Seiten als Miniaturen ansehen und in der Vorschau zoomen und verschieben.
 - Helle oder dunkle Oberfläche; auf Wunsch passend zur Systemeinstellung.
 
@@ -61,6 +65,13 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 vorhandenen Ausgabedateien. Wähle zum Speichern einen neuen Dateinamen.
 Eigene Anmerkungen bleiben nach dem Speichern und erneuten Öffnen bearbeitbar.
 
+Neue Textfelder und Bilder findest du in der Vorschau unter **Einfügen**.
+Mit dem Pfeilwerkzeug kannst du eigene Objekte auswählen und verschieben;
+die Eckpunkte ändern ihre Größe. Ein Doppelklick öffnet die Eigenschaften.
+**Strg + F** öffnet die Suche. **Datei → Bilder zu PDF-Seiten …** übernimmt Fotos
+als neue Seiten; **Datei → Durchsuchbare PDF erstellen (OCR) …** startet die
+optionale Texterkennung. Die [OCR-Anleitung](docs/ocr.md) erklärt die Einrichtung.
+
 Der blaue Rahmen zeigt die Seite in der Vorschau, die Häkchen zeigen die
 Auswahl für die Werkzeuge. Mehr zur Bedienung steht in der
 [kurzen Anleitung](docs/usage.md).
@@ -81,6 +92,9 @@ Originalfarben.
 | Links / rechts drehen | Strg + `L` / Strg + `R` |
 | Duplizieren / entfernen | Strg + `D` / Entf |
 | Rückgängig | Strg + `Z` |
+| Text suchen | Strg + `F`; Eingabe / Umschalt + Eingabe zum nächsten / vorigen Treffer |
+| Eigenes Objekt bearbeiten | Doppelklick, F2 oder Eingabe im Pfeilwerkzeug |
+| Objekt verschieben / abbrechen | Pfeiltasten; Umschalt für größere Schritte / Esc |
 
 ## Grenzen
 
@@ -89,8 +103,9 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 
 - Verschlüsselte PDFs, interaktive Formulare und mit Zertifikaten signierte
   Dateien werden derzeit abgewiesen.
-- Textmarkierungen brauchen eine vorhandene Textschicht. OCR und das Bearbeiten
-  bestehender PDF-Texte sind nicht enthalten.
+- Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
+  sie für Scans ergänzen. Bestehender PDF-Text lässt sich nicht direkt ändern;
+  neue Textfelder sind eigene Objekte.
 - Dokumentweite Lesezeichen, Anhänge, Metadaten und Tags werden beim Export
   nicht übernommen. PDF/A-Konformität ist nicht garantiert.
 - Vorhandene Seitenanmerkungen werden übernommen. Interne Verweise auf entfernte

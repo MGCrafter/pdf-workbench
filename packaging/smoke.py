@@ -240,6 +240,101 @@ class PdfAcceptance(unittest.TestCase):
         for page in pages:
             self.assertEqual(page['/Annots'][0].get_object().raw_get('/P'), page.indirect_reference)
 
+def feature_acceptance(window, directory, app, wait_for):
+    from dataclasses import replace
+    from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+    from PyQt6.QtGui import QColor, QFont, QImage, QKeyEvent, QPainter
+    from PyQt6.QtWidgets import QDialog
+    from pdf_workbench.annotations import PageAnnotation, load_image_asset
+    from pdf_workbench.core import PageRef
+    from pdf_workbench.image_import import ImagePageOptions, load_image_source
+    from pdf_workbench.ocr import discover_engine, export_searchable_pdf
+    from pdf_workbench.ui.annotation_overlay import registered_text_font_family
+    preview = window.preview
+    baseline = tuple(window.workspace.pages)
+    page_uid = preview.page.uid
+    def enter_text(dialog):
+        dialog.show(); app.processEvents()
+        dialog.editor.setPlainText('  Workbench Text\nGrüße €')
+        dialog.font_size.setValue(12)
+        assert dialog.validate()
+        dialog.accept()
+        return QDialog.DialogCode.Accepted
+    window.set_annotation_tool('text')
+    with patch('pdf_workbench.app.TextObjectDialog.exec', enter_text):
+        preview.place_annotation(preview.basis_to_canvas((.1,.1)), preview.basis_to_canvas((.85,.35)))
+    text = preview.selected_annotation
+    assert text.kind == 'text' and text.text.startswith('  ')
+    assert preview.tool == 'select'
+    preview.canvas.setFocus(); app.processEvents()
+    def key(value, modifiers=Qt.KeyboardModifier.NoModifier):
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, value, modifiers)
+        app.sendEvent(preview.canvas, event); app.processEvents()
+    key(Qt.Key.Key_Right)
+    assert preview.selected_annotation.rect[0] > text.rect[0]
+    window.undo_button.click(); assert preview.selected_annotation == text
+    key(Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+    assert len(preview.page.annotations) == len(baseline[0].annotations)+2
+    key(Qt.Key.Key_Delete)
+    assert len(preview.page.annotations) == len(baseline[0].annotations)+1
+    with patch('pdf_workbench.app.TextObjectDialog.get_annotation', return_value=replace(text, text='  Workbench Text\nBearbeitet €')):
+        preview.set_selected_annotation(text.uid); key(Qt.Key.Key_F2)
+    assert preview.selected_annotation.text.endswith('Bearbeitet €')
+    image = QImage(120, 60, QImage.Format.Format_ARGB32); image.fill(QColor(30,160,80,128))
+    data = QByteArray(); buffer = QBuffer(data); buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    assert image.save(buffer, 'PNG'); buffer.close()
+    asset = load_image_asset(bytes(data))
+    for index, kind in enumerate(('image','stamp','checkmark','cross')):
+        values = {'asset': asset} if kind in ('image','stamp') else {}
+        window.add_annotation(page_uid, PageAnnotation('native-'+kind, kind, (.1,.4+index*.1,.4,.48+index*.1), **values))
+    objects = directory/'gui-objects.pdf'
+    export_pdf(window.workspace.sources, window.workspace.pages, objects)
+    reopened = load_source(objects)
+    kinds = [a.kind for a in reopened.page_annotations[0]]
+    assert kinds[-5:] == ['text','image','stamp','checkmark','cross']
+    own_text = reopened.page_annotations[0][-5]
+    assert own_text.text == '  Workbench Text\nBearbeitet €'
+    pdf = PdfReader(objects); fonts = pdf.pages[0]['/Annots'][-5].get_object()['/AP']['/N']['/Resources']['/Font']
+    font = next(iter(fonts.values())).get_object()
+    assert '/ToUnicode' in font and '/FontFile2' in font['/DescendantFonts'][0].get_object()['/FontDescriptor']
+    # Exercise the GUI's asynchronous search against the newly inserted text.
+    window.search_bar.open(); window.search_bar.editor.setText('Workbench Text')
+    wait_for(lambda: window.search_bar.worker is None and bool(window.search_bar.results.hits))
+    assert window.search_bar.results.hits[0].annotation_uid == text.uid
+    assert preview.search_hit is not None
+    window.search_bar.dismiss(); assert preview.search_hit is None
+    # Image import is one undo transaction and a self-contained PDF snapshot.
+    path = directory/'native-image.png'; assert image.save(str(path))
+    before_images = tuple(window.workspace.pages)
+    with patch('pdf_workbench.app.ImagePagesDialog.get_request', return_value=([str(path)], ImagePageOptions('Letter','landscape',5))):
+        window.import_images()
+    wait_for(lambda: window.job is None)
+    assert len(window.workspace.pages) == len(before_images)+1
+    window.page_list.setFocus(); window.undo_button.click()
+    assert tuple(window.workspace.pages) == before_images
+    checks = ['objects select/move/duplicate/delete/undo', 'objects text/image/stamp/symbol PDF roundtrip',
+              'objects bundled font and Unicode', 'asynchronous text search', 'images to PDF and undo']
+    # OCR is optional for users, mandatory in release CI with a prepared engine.
+    ocr_cache = os.environ.get('PDF_WORKBENCH_OCR_TEST_TESSDATA')
+    engine = discover_engine(cache_dir=ocr_cache)
+    if engine and engine.pdf_font and 'eng' in engine.languages:
+        scanned = QImage(900, 250, QImage.Format.Format_RGB32); scanned.fill(QColor('white'))
+        painter = QPainter(scanned); painter.setPen(QColor('black'))
+        painter.setFont(QFont(registered_text_font_family(), 32)); painter.drawText(50, 145, 'LOCAL OCR TEST 123'); painter.end()
+        scan = directory/'native-scan.png'; assert scanned.save(str(scan))
+        source = load_image_source(scan)
+        page = PageRef('native-scan', source.source_id, 0)
+        ocr_directory = directory / 'OCR-Grüße'; ocr_directory.mkdir()
+        result = export_searchable_pdf({source.source_id: source}, [page], ocr_directory/'durchsuchbar.pdf', engine=engine, languages=('eng',), cache_dir=ocr_cache)
+        assert result.processed_pages == 1 and result.skipped_pages == 0
+        assert 'OCR TEST 123' in PdfReader(result.path).pages[0].extract_text()
+        assert PdfReader(result.path).pages[0]['/Resources']['/XObject']
+        checks.append('local OCR searchable text and preserved image')
+    elif os.environ.get('PDF_WORKBENCH_REQUIRE_OCR') == '1':
+        raise AssertionError('The native release OCR check requires Tesseract, English and pdf.ttf')
+    return checks
+
+
 def gui_acceptance(directory: Path):
     from PyQt6.QtCore import QEvent, QItemSelectionModel, QObject, QPoint, QPointF, QSettings, QSize, QT_VERSION_STR, PYQT_VERSION_STR, Qt, pyqtSignal, qVersion
     from PyQt6.QtGui import QMouseEvent, QPalette, QWheelEvent
@@ -497,10 +592,12 @@ def gui_acceptance(directory: Path):
             document.close()
             return image
         assert render_pdf(edited_output) == render_pdf(themed_output), 'Theme changed exported document colors'
+        feature_checks = feature_acceptance(window, directory, app, wait_for)
         preview.fit_page(); app.processEvents()
+        wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
         assert window.grab().save(str(screenshot))
-        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates", "appearance dark/light/system", "appearance persisted", "appearance preserves document and viewport", "appearance document/export colors", "appearance dialogs and icons"]}
+        return {"result": "PASS", "app_version": __version__, "qt_platform": app.platformName(), "qt_runtime": qVersion(), "qt_binding_compile_version": QT_VERSION_STR, "pyqt": PYQT_VERSION_STR, "screenshot": str(screenshot), "checks": ["multiple import and active page", "rendered annotation", "async preview", "rotate", "move", "delete/undo", "selected export", "merged export", "range selection", "duplicate", "individual-page export", "zoom and fit", "grid/list", "resize", "horizontal tilt wheel", "touchpad diagonal pixels", "Shift+wheel", "middle-button pan in comment mode", "comment Unicode", "real PDF text highlight", "drawn signature", "export/reopen/edit/delete annotations without duplicates", "appearance dark/light/system", "appearance persisted", "appearance preserves document and viewport", "appearance document/export colors", "appearance dialogs and icons"] + feature_checks}
     finally:
         if window.job:
             window.job.cancel_event.set()

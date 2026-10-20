@@ -40,7 +40,8 @@ Die Werkzeuge dafür findest du unter den Zoomknöpfen und im Menü **Anmerkunge
   den Text eingeben.
 - **Text markieren:** Über vorhandenen PDF-Text ziehen. Die Markierung folgt
   den ausgewählten Textzeilen. Scans ohne Textschicht lassen sich so nicht
-  markieren; Texterkennung ist nicht enthalten.
+  markieren. Mit der optionalen Texterkennung lässt sich zuerst eine
+  durchsuchbare PDF erstellen und anschließend öffnen.
 - **Gezeichnete Unterschrift:** Im Dialog mit gedrückter linker Maustaste zeichnen.
   **Neu zeichnen** leert die Fläche. Danach auf die PDF klicken, um die Zeichnung
   in Standardgröße zu platzieren, oder einen Bereich für die gewünschte Größe
@@ -99,3 +100,37 @@ Die App speichert die Auswahl. Mit **System** folgt die Oberfläche dem hellen
 oder dunklen Erscheinungsbild des Betriebssystems, auch wenn es während der
 Benutzung wechselt. Ein manueller Wechsel verändert weder die PDF-Farben noch
 Zoom, Scrollposition oder den Verlauf deiner Änderungen.
+
+## Textfelder, Bilder und Stempel
+
+Unter **Einfügen** in der Vorschau wählst du Textfeld, Bild, Bildstempel,
+Häkchen oder Kreuz. Ein Klick setzt einen Standardrahmen, Ziehen legt den
+gewünschten Bereich fest. Textfelder unterstützen mehrere Zeilen, Schriftgröße,
+Farbe, Ausrichtung und Drehung. Nicht unterstützte Zeichen oder zu kleine
+Rahmen werden im Dialog gemeldet. Liberation Sans ist bereits enthalten.
+
+Das Pfeilwerkzeug wählt eigene Objekte aus. Ziehen verschiebt sie, die vier
+Eckgriffe ändern ihre Größe. Bilder behalten dabei ihre Proportionen; mit
+Umschalt kannst du sie frei strecken. Doppelklick, F2 oder Eingabe öffnen die
+Eigenschaften. Entf löscht das ausgewählte Objekt, Strg + D erzeugt eine Kopie.
+Die Pfeiltasten verschieben um einen Punkt, mit Umschalt um zehn Punkte.
+Ein laufender Entwurf wird mit Esc verworfen; die fertige Bewegung lässt sich
+mit einem Schritt rückgängig machen. Das Kontextmenü und das Menü
+**Anmerkungen** bieten dieselben Bearbeitungsaktionen.
+
+## Suchen und Bildseiten
+
+**Strg + F** sucht in der aktuellen Seitenreihenfolge. Eingabe und Umschalt +
+Eingabe springen durch die Treffer, Esc schließt die Suchleiste. Die Suche
+berücksichtigt vorhandenen PDF-Text und eigene Textfelder. Bei einem Textfeld
+wird dessen Rahmen hervorgehoben. Die Seitenauswahl für den Export bleibt beim
+Springen erhalten. Scans benötigen zuerst eine Textschicht.
+
+Unter **Datei → Bilder zu PDF-Seiten …** wählst du PNG- oder JPEG-Dateien,
+Seitenformat, Ausrichtung und Rand. Die Bilder werden als neue Seiten in den
+Arbeitsbereich übernommen und können dort sortiert werden. Ein gemeinsamer
+Import ist ein Undo-Schritt. Sehr kleine Bilder können für das Bildformat
+zu klein sein; A4 und Letter funktionieren auch dann.
+
+**Datei → Durchsuchbare PDF erstellen (OCR) …** ist in der
+[OCR-Anleitung](ocr.md) beschrieben.

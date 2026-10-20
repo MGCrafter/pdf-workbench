@@ -70,3 +70,28 @@ vergleicht für alle 16 Kombinationen den Export vor und nach dem
 Wiederöffnen pixelgenau und bestätigt, dass Löschen auch die Darstellung
 entfernt. Der Poppler-Test wird nur ausgeführt, wenn `pdftoppm` installiert
 ist; die übrigen Core-Tests benötigen keine grafische Oberfläche.
+
+## Textfelder, Bilder und Symbole
+
+Eigene Textfelder sind `/FreeText`-Anmerkungen. Ihr Appearance-Stream enthält
+den Text mit einem eingebetteten Type0/CIDFont und ToUnicode-Zuordnung;
+Liberation Sans wird unverändert mit OFL-Lizenz mitgeliefert. Die gleiche
+Schrift und Zeilenaufteilung werden für Vorschau und Export verwendet.
+
+PNG-/JPEG-Bilder und Bildstempel werden als `/Stamp` mit eigenem Bild-Stream
+und gegebenenfalls Alpha-Maske gespeichert. Häkchen und Kreuze sind Vektorpfade.
+Gleiche unveränderliche Bilddaten werden geteilt, ihre Objektgeometrie bleibt
+unabhängig. Beim Einfügen werden Bilder in den gewählten Rahmen eingepasst;
+mit Umschalt lässt sich ein Objekt anschließend frei strecken.
+
+Diese Objekte verwenden Modellversion 3. Der Fingerabdruck umfasst auch Stil,
+Schrift, Bilddaten, Alpha-Maske und Appearance-Ressourcen. Version-2-Kommentare,
+Markierungen und Unterschriften bleiben lesbar. Extern veränderte oder nicht
+verstandene Einträge werden weiterhin als fremde Anmerkungen erhalten.
+CropBox, ursprüngliche und zusätzliche Drehung sowie UserUnit werden bei
+Platzierung, Schriftgröße und Wiederöffnen berücksichtigt.
+
+Bilder für eigene Objekte sind auf 8 MiB und vier Millionen Bildpunkte begrenzt.
+Für neue Bildseiten gelten 32 MiB und 16 Millionen Bildpunkte. Textfelder
+melden fehlende Schriftzeichen, komplexe nicht unterstützte Schriftgestaltung
+und zu kleine Rahmen vor der Übernahme.

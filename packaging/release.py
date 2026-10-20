@@ -44,6 +44,12 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
                     'appearance dialogs and icons'}
         if not required <= set(gui.get('checks', [])):
             raise ValueError('A complete native theme acceptance is required for this version.')
+    if tuple(int(part) for part in version.split('.')[:2]) >= (0, 5):
+        required = {'objects select/move/duplicate/delete/undo', 'objects text/image/stamp/symbol PDF roundtrip',
+                    'objects bundled font and Unicode', 'asynchronous text search', 'images to PDF and undo',
+                    'local OCR searchable text and preserved image'}
+        if not required <= set(gui.get('checks', [])):
+            raise ValueError('A complete native object/search/image/OCR acceptance is required for this version.')
     return report
 
 
@@ -68,7 +74,8 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
             raise ValueError(f'Bundled notice checksum mismatch: {relative}')
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     source_hashes = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-                     for p in sorted((ROOT / 'src').rglob('*.py'))}
+                     for p in sorted((ROOT / 'src').rglob('*'))
+                     if p.is_file() and p.suffix in ('.py', '.ttf', '.txt')}
     report = verify_acceptance(bundle, results, version, commit, source_hashes)
     metadata = {'app_version': version, 'source_commit': commit,
                 'source_repository': 'https://github.com/MGCrafter/pdf-workbench',

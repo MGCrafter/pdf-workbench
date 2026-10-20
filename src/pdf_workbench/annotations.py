@@ -1,4 +1,4 @@
-"""Immutable user annotations and PDF appearances, with no GUI dependency.
+"""Immutable user annotations and standalone PDF appearances.
 
 Coordinates are fractions of the visible source CropBox/MediaBox intersection,
 with its intrinsic /Rotate already applied, before any workspace rotation.
@@ -11,6 +11,10 @@ import json
 import math
 from typing import Literal, Sequence, TYPE_CHECKING
 
+from .annotation_errors import AnnotationError
+from .annotation_assets import ImageAsset, load_image_asset, restore_image_asset, image_pixels
+from .text_appearance import TextStyle, normalize_text, pdf_text
+
 from pypdf.generic import (
     ArrayObject, BooleanObject, ByteStringObject, DecodedStreamObject, DictionaryObject,
     FloatObject, IndirectObject, NameObject, NullObject, NumberObject,
@@ -22,10 +26,6 @@ if TYPE_CHECKING:
 
 Point = tuple[float, float]
 Rect = tuple[float, float, float, float]
-
-
-class AnnotationError(ValueError):
-    """Invalid user annotation, with a message suitable for the UI."""
 
 
 def _coordinate(value: object) -> float:
@@ -55,19 +55,32 @@ def _rect(value: Sequence[float]) -> Rect:
 @dataclass(frozen=True)
 class PageAnnotation:
     uid: str
-    kind: Literal["comment", "highlight", "signature"]
+    kind: Literal["comment", "highlight", "signature", "text", "image", "stamp", "checkmark", "cross"]
     rect: Rect
     text: str = ""
     rects: tuple[Rect, ...] = ()
     strokes: tuple[tuple[Point, ...], ...] = ()
+    style: TextStyle = TextStyle()
+    asset: ImageAsset | None = None
+    content_rotation: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.uid, str) or not self.uid.strip():
             raise AnnotationError("Eine Anmerkung benötigt eine eindeutige Kennung.")
-        if self.kind not in ("comment", "highlight", "signature"):
+        if self.kind not in ("comment", "highlight", "signature", "text", "image", "stamp", "checkmark", "cross"):
             raise AnnotationError("Dieser Anmerkungstyp wird nicht unterstützt.")
         if not isinstance(self.text, str):
             raise AnnotationError("Der Anmerkungstext muss Text sein.")
+        if not isinstance(self.style, TextStyle):
+            raise AnnotationError("Der Anmerkungsstil ist ungültig.")
+        if type(self.content_rotation) is not int or self.content_rotation not in (0, 90, 180, 270):
+            raise AnnotationError("Die Objektrotation muss 0, 90, 180 oder 270 Grad sein.")
+        if self.kind == "text":
+            object.__setattr__(self, "text", normalize_text(self.text))
+        if self.kind in ("image", "stamp") and not isinstance(self.asset, ImageAsset):
+            raise AnnotationError("Bitte wähle zuerst ein PNG- oder JPEG-Bild.")
+        if self.kind not in ("image", "stamp") and self.asset is not None:
+            raise AnnotationError("Nur Bild- und Stempelobjekte dürfen Bilddaten enthalten.")
         object.__setattr__(self, "rect", _rect(self.rect))
         try:
             object.__setattr__(self, "rects", tuple(_rect(value) for value in self.rects))
@@ -110,7 +123,10 @@ def rotate_annotation(annotation: PageAnnotation, degrees: int) -> PageAnnotatio
         return _bounds(points)
     return replace(annotation, rect=rect(annotation.rect),
                    rects=tuple(rect(value) for value in annotation.rects),
-                   strokes=tuple(tuple(point(*p) for p in stroke) for stroke in annotation.strokes))
+                   strokes=tuple(tuple(point(*p) for p in stroke) for stroke in annotation.strokes),
+                   content_rotation=((annotation.content_rotation + angle) % 360
+                                     if annotation.kind in ("text", "image", "stamp", "checkmark", "cross")
+                                     else annotation.content_rotation))
 
 
 def visible_page_box(page: PageObject) -> Rect:
@@ -162,11 +178,11 @@ def _number(value: float) -> str:
     return f"{value:.7f}".rstrip("0").rstrip(".") or "0"
 
 
-def _appearance(writer: PdfWriter, bounds: Rect, commands: list[str], transparent: bool = False):
+def _appearance(writer: PdfWriter, bounds: Rect, commands: list[str], transparent: bool = False, resources=None):
     left, bottom, right, top = bounds
     stream = DecodedStreamObject()
     stream.set_data(("q\n" + "\n".join(commands) + "\nQ\n").encode("ascii"))
-    resources = DictionaryObject()
+    resources = resources if resources is not None else DictionaryObject()
     if transparent:
         resources[NameObject("/ExtGState")] = DictionaryObject({NameObject("/GS0"): DictionaryObject({
             NameObject("/Type"): NameObject("/ExtGState"),
@@ -260,6 +276,34 @@ def _annotation_fingerprint(pdf: DictionaryObject) -> str:
     return digest.hexdigest()
 
 
+def _pdf_image(writer: PdfWriter, asset: ImageAsset):
+    """Share immutable image streams, never page/annotation dictionaries."""
+    cache = getattr(writer, "_pdf_workbench_images", None)
+    if cache is None:
+        cache = writer._pdf_workbench_images = {}
+    if asset.sha256 in cache:
+        return cache[asset.sha256]
+    rgb, alpha = image_pixels(asset)
+    image = DecodedStreamObject()
+    image.set_data(rgb)
+    image.update({NameObject("/Type"): NameObject("/XObject"), NameObject("/Subtype"): NameObject("/Image"),
+                  NameObject("/Width"): NumberObject(asset.width), NameObject("/Height"): NumberObject(asset.height),
+                  NameObject("/ColorSpace"): NameObject("/DeviceRGB"), NameObject("/BitsPerComponent"): NumberObject(8)})
+    if alpha is not None:
+        mask = DecodedStreamObject()
+        mask.set_data(alpha)
+        mask.update({NameObject("/Type"): NameObject("/XObject"), NameObject("/Subtype"): NameObject("/Image"),
+                     NameObject("/Width"): NumberObject(asset.width), NameObject("/Height"): NumberObject(asset.height),
+                     NameObject("/ColorSpace"): NameObject("/DeviceGray"), NameObject("/BitsPerComponent"): NumberObject(8)})
+        image[NameObject("/SMask")] = writer._add_object(mask.flate_encode())
+    private = DecodedStreamObject()
+    private.set_data(asset.data)
+    private[NameObject("/Subtype")] = NameObject("/WorkbenchImage")
+    result = writer._add_object(image.flate_encode()), writer._add_object(private.flate_encode())
+    cache[asset.sha256] = result
+    return result
+
+
 def add_pdf_annotations(writer: PdfWriter, output_page: PageObject, source_page: PageObject,
                         annotations: Sequence[PageAnnotation], workspace_rotation: int = 0) -> None:
     """Append real PDF annotations; preserve the source's existing annotations."""
@@ -281,7 +325,44 @@ def add_pdf_annotations(writer: PdfWriter, output_page: PageObject, source_page:
                                 NameObject("/F"): NumberObject(4),
                                 NameObject("/Contents"): TextStringObject(annotation.text)})
         commands = []
-        if annotation.kind == "highlight":
+        resources = None
+        asset_ref = None
+        if annotation.kind in ("text", "image", "stamp", "checkmark", "cross"):
+            pdf[NameObject("/Subtype")] = NameObject("/FreeText" if annotation.kind == "text" else "/Stamp")
+            pdf[NameObject("/Border")] = _array((0, 0, 0))
+            def rotated(x, y):
+                angle = annotation.content_rotation
+                return (x, y) if angle == 0 else ((1-y, x) if angle == 90 else ((1-x, 1-y) if angle == 180 else (y, 1-x)))
+            def content_point(x, y):
+                return local_point(*rotated(x, y))
+            p0, px, py = content_point(0, 1), content_point(1, 1), content_point(0, 0)
+            width = math.dist(p0, px)
+            height = math.dist(p0, py)
+            if annotation.kind == "text":
+                unit = float(source_page.get("/UserUnit", 1))
+                if not math.isfinite(unit) or unit <= 0:
+                    raise AnnotationError("Die PDF-Seite hat eine ungültige Maßeinheit.")
+                resources, operators = pdf_text(writer, annotation.text, annotation.style, width, height, unit)
+                matrix = ((px[0]-p0[0])/width, (px[1]-p0[1])/width,
+                          (py[0]-p0[0])/height, (py[1]-p0[1])/height, p0[0]-left, p0[1]-bottom)
+                commands += [" ".join(_number(v) for v in matrix)+" cm", *operators]
+                pdf[NameObject("/Q")] = NumberObject({"left": 0, "center": 1, "right": 2}[annotation.style.alignment])
+                pdf[NameObject("/DA")] = TextStringObject("/F0 " + _number(annotation.style.font_size/unit) + " Tf " + " ".join(_number(v) for v in annotation.style.color) + " rg")
+            elif annotation.kind in ("image", "stamp"):
+                image_ref, asset_ref = _pdf_image(writer, annotation.asset)
+                resources = DictionaryObject({NameObject("/XObject"): DictionaryObject({NameObject("/Im0"): image_ref})})
+                matrix = (px[0]-p0[0], px[1]-p0[1], py[0]-p0[0], py[1]-p0[1], p0[0]-left, p0[1]-bottom)
+                commands += [" ".join(_number(v) for v in matrix)+" cm", "/Im0 Do"]
+                pdf[NameObject("/Name")] = NameObject("/Image")
+            else:
+                commands += [" ".join(_number(v) for v in annotation.style.color)+" RG", "1 J 1 j", _number(max(.5, min(width, height)*.08))+" w"]
+                paths = (((.14, .52), (.40, .80), (.86, .18)),) if annotation.kind == "checkmark" else (((.18, .18), (.82, .82)), ((.82, .18), (.18, .82)))
+                for path in paths:
+                    commands.append(point_command(content_point(*path[0]))+" m")
+                    commands += [point_command(content_point(*point))+" l" for point in path[1:]]
+                    commands.append("S")
+                pdf[NameObject("/Name")] = NameObject("/Checkmark" if annotation.kind == "checkmark" else "/Cross")
+        elif annotation.kind == "highlight":
             pdf[NameObject("/Subtype")] = NameObject("/Highlight")
             pdf[NameObject("/QuadPoints")] = _array([v for quad in quads for p in quad for v in p])
             pdf[NameObject("/C")] = _array((1, .84, 0))
@@ -316,15 +397,31 @@ def add_pdf_annotations(writer: PdfWriter, output_page: PageObject, source_page:
                           ((.05,.251472),(.251472,.05),(.5,.05))):
                 commands.append(" ".join(point_command(local_point(*p)) for p in curve)+" c")
             commands.append("h B")
-        pdf[NameObject("/AP")] = _appearance(writer, bounds, commands, annotation.kind == "highlight")
+        pdf[NameObject("/AP")] = _appearance(writer, bounds, commands, annotation.kind == "highlight", resources)
         final_model = rotate_annotation(annotation, workspace_rotation)
         payload = {"uid": final_model.uid, "kind": final_model.kind, "rect": final_model.rect,
                    "text": final_model.text, "rects": final_model.rects, "strokes": final_model.strokes}
+        version = 3 if annotation.kind in ("text", "image", "stamp", "checkmark", "cross") else 2
+        if version == 3:
+            payload.update(style={"font_size": final_model.style.font_size, "color": final_model.style.color,
+                                  "alignment": final_model.style.alignment},
+                           content_rotation=final_model.content_rotation,
+                           asset_sha256=final_model.asset.sha256 if final_model.asset else None)
+        serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > 2_000_000:
+            raise AnnotationError("Die Anmerkungsdaten überschreiten die Modellgrößengrenze.")
         pdf[NameObject("/PDFWorkbench")] = DictionaryObject({
-            NameObject("/Version"): NumberObject(2),
+            NameObject("/Version"): NumberObject(version),
             NameObject("/BaseRotation"): NumberObject((source_page.rotation + workspace_rotation) % 360),
-            NameObject("/Model"): TextStringObject(json.dumps(payload, ensure_ascii=False, separators=(",", ":"))),
+            NameObject("/Model"): TextStringObject(serialized),
         })
+        if version == 3:
+            base_unit = float(source_page.get("/UserUnit", 1))
+            if not math.isfinite(base_unit) or base_unit <= 0:
+                raise AnnotationError("Die PDF-Seite hat eine ungültige Maßeinheit.")
+            pdf["/PDFWorkbench"][NameObject("/BaseUserUnit")] = FloatObject(base_unit)
+        if asset_ref is not None:
+            pdf["/PDFWorkbench"][NameObject("/Asset")] = asset_ref
         pdf["/PDFWorkbench"][NameObject("/Fingerprint")] = TextStringObject(_annotation_fingerprint(pdf))
         writer.add_annotation(output_page, pdf)
 
@@ -336,21 +433,60 @@ def _read_own_annotation(page: PageObject, pdf: DictionaryObject) -> PageAnnotat
         if marker is None:
             return None
         marker = marker.get_object()
-        if marker.get("/Version") != 2:
+        version = marker.get("/Version")
+        if version not in (2, 3):
             return None
         rotation = marker.get("/BaseRotation")
         if isinstance(rotation, bool) or rotation not in (0, 90, 180, 270):
             return None
         model = marker.get("/Model")
-        if not isinstance(model, str) or len(model) > 2_000_000:
+        if not isinstance(model, str) or len(model.encode("utf-8")) > 2_000_000:
             return None
         payload = json.loads(model)
-        if not isinstance(payload, dict) or set(payload) != {"uid", "kind", "rect", "text", "rects", "strokes"}:
+        keys = {"uid", "kind", "rect", "text", "rects", "strokes"}
+        if version == 3:
+            keys |= {"style", "content_rotation", "asset_sha256"}
+        if not isinstance(payload, dict) or set(payload) != keys:
+            return None
+        # Verify the whole representation before decoding private image snapshots.
+        fingerprint = marker.get("/Fingerprint")
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64 or fingerprint != _annotation_fingerprint(pdf):
+            return None
+        if version == 3:
+            if payload["kind"] not in ("text", "image", "stamp", "checkmark", "cross"):
+                return None
+            style = payload["style"]
+            if not isinstance(style, dict) or set(style) != {"font_size", "color", "alignment"}:
+                return None
+            payload["style"] = TextStyle(**style)
+            digest = payload.pop("asset_sha256")
+            asset = marker.get("/Asset")
+            if payload["kind"] in ("image", "stamp"):
+                if asset is None:
+                    return None
+                asset = asset.get_object()
+                if not isinstance(asset, StreamObject) or asset.get("/Subtype") != "/WorkbenchImage":
+                    return None
+                payload["asset"] = restore_image_asset(asset.get_data())
+                if payload["asset"].sha256 != digest:
+                    return None
+            elif digest is not None or asset is not None:
+                return None
+        elif payload["kind"] not in ("comment", "highlight", "signature"):
             return None
         annotation = PageAnnotation(**payload)
+        if version == 3:
+            base_unit = float(marker.get("/BaseUserUnit", 0))
+            current_unit = float(page.get("/UserUnit", 1))
+            if not all(math.isfinite(value) and value > 0 for value in (base_unit, current_unit)):
+                return None
+            if annotation.kind == "text" and current_unit != base_unit:
+                # An external UserUnit change scales the existing AP as well.
+                annotation = replace(annotation, style=replace(annotation.style,
+                    font_size=annotation.style.font_size * current_unit / base_unit))
         if pdf.get("/NM") != "PDFWorkbench:" + annotation.uid:
             return None
-        if pdf.get("/Subtype") != {"comment": "/Text", "highlight": "/Highlight", "signature": "/Ink"}[annotation.kind]:
+        if pdf.get("/Subtype") != {"comment": "/Text", "highlight": "/Highlight", "signature": "/Ink", "text": "/FreeText", "image": "/Stamp", "stamp": "/Stamp", "checkmark": "/Stamp", "cross": "/Stamp"}[annotation.kind]:
             return None
         if pdf.get("/Contents", "") != annotation.text:
             return None
@@ -362,9 +498,6 @@ def _read_own_annotation(page: PageObject, pdf: DictionaryObject) -> PageAnnotat
             return None
         normal = pdf.get("/AP", {}).get("/N")
         if normal is None or not hasattr(normal.get_object(), "get_data"):
-            return None
-        fingerprint = marker.get("/Fingerprint")
-        if not isinstance(fingerprint, str) or len(fingerprint) != 64 or fingerprint != _annotation_fingerprint(pdf):
             return None
         return annotation
     except Exception:

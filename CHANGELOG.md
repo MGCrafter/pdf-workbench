@@ -1,5 +1,23 @@
 # Änderungen
 
+## 0.5.0
+
+Eigene Inhalte ergänzen und direkt auf der Seite bearbeiten:
+
+- Textfelder mit mehreren Zeilen, Schriftgröße, Farbe und Ausrichtung.
+- PNG-/JPEG-Bilder, Bildstempel, Häkchen und Kreuze.
+- Auswahlwerkzeug mit Verschieben, Eckgriffen, Duplizieren und Löschen.
+  Esc verwirft den Entwurf; eine fertige Bewegung ist ein Undo-Schritt.
+- Strg + F durchsucht PDFs und eigene Textfelder im Hintergrund.
+- Bilder als neue A4-, Letter- oder Bildformat-Seiten übernehmen.
+- Optionale lokale Texterkennung mit Tesseract: Eine zusätzliche PDF erhält
+  eine unsichtbare Textschicht. Die vorhandenen Seiteninhalte bleiben erhalten.
+
+Die Textschrift ist im Programm und im PDF enthalten. Eigene Objekte bleiben
+nach dem Speichern und erneuten Öffnen bearbeitbar. OCR braucht eine separate
+Tesseract-Installation; fehlende deutsche und englische Sprachpakete können
+im Dialog ausdrücklich heruntergeladen werden.
+
 ## 0.4.0
 
 Die Oberfläche gibt es jetzt auch in Dunkel. Unter **Ansicht → Darstellung**

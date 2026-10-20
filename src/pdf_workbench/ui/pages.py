@@ -4,7 +4,7 @@ import json
 from PyQt6.QtCore import QMimeData, QPoint, QPointF, QRectF, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QDrag, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QAbstractItemView, QListView, QListWidget, QStyle, QStyledItemDelegate
-from .annotation_overlay import draw_annotations
+from .annotation_overlay import draw_annotations, source_page_geometry
 from .theme import color
 
 UID_ROLE = Qt.ItemDataRole.UserRole
@@ -51,14 +51,15 @@ class PageDelegate(QStyledItemDelegate):
         key = self.view.broker.request(source, page, bounds)
         cached = self.view.broker.get(key)
         if cached:
-            image, _ = cached
+            image, points = cached
             scaled = image.size().scaled(image_box.size(), Qt.AspectRatioMode.KeepAspectRatio)
             paper = QRectF(0, 0, scaled.width(), scaled.height())
             paper.moveCenter(QRectF(image_box).center())
             painter.fillRect(paper.translated(2, 2), color("shadow"))
             painter.fillRect(paper, QColor("#ffffff"))
             painter.drawImage(paper, image)
-            draw_annotations(painter, paper, page)
+            _, unit = source_page_geometry(source, page)
+            draw_annotations(painter, paper, page, points, unit)
         else:
             paper = QRectF(0, 0, min(image_box.width(), image_box.height() * 0.68), image_box.height())
             paper.moveCenter(QRectF(image_box).center())

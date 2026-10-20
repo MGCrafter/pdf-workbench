@@ -13,7 +13,8 @@ from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QListWidgetItem, QMainWindow, QMessageBox, QProgressBar,
-    QPushButton, QSizePolicy, QSplitter, QStackedWidget, QToolButton,
+    QPushButton, QSizePolicy, QSplitter, QStackedWidget, QToolButton, QMenu,
+    QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -22,11 +23,18 @@ from .core import OperationCancelled, PageRef, PdfWorkbenchError, Workspace, exp
 from .features import export_pages_separately, parse_page_selection
 from .ui.dialogs import PageRangeDialog, SeparateExportDialog
 from .ui.annotation_dialogs import AnnotationListDialog, CommentDialog, SignatureDialog
-from .ui.annotation_overlay import display_to_basis
+from .ui.annotation_overlay import display_to_basis, source_page_geometry, validate_text_object
+from .ui.object_dialogs import TextObjectDialog, ImageObjectDialog, SymbolObjectDialog
 from .ui.icons import icon
 from .ui.pages import PAGE_ROLE, POSITION_ROLE, SOURCE_ROLE, UID_ROLE, PageList
 from .ui.preview import Preview
 from .ui.rendering import RenderBroker
+from .ui.search_bar import SearchBar
+from .ui.image_dialog import ImagePagesDialog
+from .image_import import load_image_source
+from .ocr import export_searchable_pdf
+from .ui.ocr_dialog import OcrDialog
+from .ui.status import StatusLabel
 from .ui.theme import file_dialog_options, semantic_label, stylesheet, theme_controller
 
 
@@ -140,6 +148,12 @@ class MainWindow(QMainWindow):
         tools.addWidget(self.preview_toggle)
         outer.addWidget(toolbar)
 
+        self.search_bar = SearchBar(lambda: (dict(self.workspace.sources), tuple(self.workspace.pages)), self)
+        self.search_bar.hit_selected.connect(self.show_search_hit)
+        self.search_bar.cleared.connect(self.clear_search_hit)
+        self.search_bar.closed.connect(self._rendering_closed)
+        outer.addWidget(self.search_bar)
+
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         left = QWidget(); left_layout = QVBoxLayout(left); left_layout.setContentsMargins(0, 0, 0, 0); left_layout.setSpacing(8)
@@ -199,12 +213,21 @@ class MainWindow(QMainWindow):
         right_layout.addLayout(zoom_bar)
         annotation_bar = QHBoxLayout(); annotation_bar.setSpacing(3)
         self.pan_button = self._tool("Hand: Seite verschieben", "hand", lambda: self.set_annotation_tool("pan"))
+        self.object_select_button = self._tool("Objekte auswählen und verschieben", "select", lambda: self.set_annotation_tool("select"))
         self.comment_button = self._tool("Kommentar: auf die Seite klicken", "comment", lambda: self.set_annotation_tool("comment"))
         self.highlight_button = self._tool("Text markieren: über PDF-Text ziehen", "highlight", lambda: self.set_annotation_tool("highlight"))
         self.signature_button = self._tool("Gezeichnete Unterschrift …", "signature", self.choose_signature)
         self.annotation_group = QButtonGroup(self); self.annotation_group.setExclusive(True)
-        for button in (self.pan_button, self.comment_button, self.highlight_button, self.signature_button):
+        for button in (self.pan_button, self.object_select_button, self.comment_button, self.highlight_button, self.signature_button):
             button.setCheckable(True); self.annotation_group.addButton(button); annotation_bar.addWidget(button)
+        self.insert_button = self._tool("Einfügen", "add", lambda: None, text=True)
+        self.insert_button.setCheckable(True); self.annotation_group.addButton(self.insert_button)
+        self.insert_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        insert_menu = QMenu(self.insert_button)
+        self.object_actions = []
+        for kind, label in (("text", "Textfeld …"), ("image", "Bild …"), ("stamp", "Stempel aus Bild …"), ("checkmark", "Häkchen"), ("cross", "Kreuz")):
+            self.object_actions.append(self._action(insert_menu, label, None, lambda checked=False, value=kind: self.set_annotation_tool(value)))
+        self.insert_button.setMenu(insert_menu); annotation_bar.addWidget(self.insert_button)
         self.pan_button.setChecked(True)
         annotation_bar.addStretch()
         self.annotations_button = self._tool("Anmerkungen (0) …", "list", self.manage_annotations, text=True)
@@ -219,14 +242,19 @@ class MainWindow(QMainWindow):
         self.preview.comment_requested.connect(self.add_comment)
         self.preview.status_message.connect(self.set_status)
         self.preview.selection_pending_changed.connect(lambda *_: self.update_controls())
+        self.preview.object_requested.connect(self.add_object)
+        self.preview.annotation_updated.connect(self.update_annotation)
+        self.preview.annotation_selected.connect(lambda *_: self.update_controls())
+        self.preview.annotation_edit_requested.connect(self.edit_object)
+        self.preview.annotation_action.connect(self.object_action)
         self.splitter.addWidget(self.preview_panel); self.splitter.setHandleWidth(14); self.splitter.setSizes([465, 660])
         outer.addWidget(self.splitter, 1)
 
         footer = QFrame(); footer.setObjectName("footer")
         footer_layout = QHBoxLayout(footer); footer_layout.setContentsMargins(0, 10, 0, 0); footer_layout.setSpacing(8)
         status_layout = QVBoxLayout(); status_layout.setSpacing(4)
-        self.status = QLabel("Bereit. Dateien bleiben auf diesem Gerät.")
-        self.status.setWordWrap(True); self.status.setMaximumHeight(36)
+        self.status = StatusLabel("Bereit. Dateien bleiben auf diesem Gerät.")
+        self.status.setWordWrap(False); self.status.setMaximumHeight(36)
         self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.status.setAccessibleName("Bearbeitungsstatus")
         status_layout.addWidget(self.status)
@@ -252,20 +280,23 @@ class MainWindow(QMainWindow):
     def _build_menu(self):
         file_menu = self.menuBar().addMenu("&Datei")
         self.open_action = self._action(file_menu, "PDFs hinzufügen …", QKeySequence.StandardKey.Open, self.open_dialog, "add")
+        self.images_action = self._action(file_menu, "Bilder zu PDF-Seiten …", None, self.import_images, "document")
         self.new_action = self._action(file_menu, "Neuer Arbeitsbereich", QKeySequence.StandardKey.New, self.new_workspace, "new")
         file_menu.addSeparator()
         self.export_action = self._action(file_menu, "Alle Seiten als neue PDF speichern …", QKeySequence.StandardKey.SaveAs, lambda: self.save_pdf(False), "export")
         self.split_action = self._action(file_menu, "Auswahl als neue PDF speichern …", "Ctrl+Shift+E", lambda: self.save_pdf(True), "export")
         self.separate_action = self._action(file_menu, "Auswahl als einzelne PDFs speichern …", None, self.save_separate_pages, "separate")
+        self.ocr_action = self._action(file_menu, "Durchsuchbare PDF erstellen (OCR) …", None, self.save_searchable_pdf, "document")
         file_menu.addSeparator(); self._action(file_menu, "Beenden", QKeySequence.StandardKey.Quit, self.close)
         edit = self.menuBar().addMenu("&Bearbeiten")
         self.undo_action = self._action(edit, "Rückgängig", QKeySequence.StandardKey.Undo, self.undo, "undo")
         self.redo_action = self._action(edit, "Wiederholen", QKeySequence.StandardKey.Redo, self.redo, "redo")
         edit.addSeparator()
+        self.search_action = self._action(edit, "Text suchen …", QKeySequence.StandardKey.Find, self.search_bar.open, "zoom_in")
         self.select_action = self._action(edit, "Alle Seiten auswählen", QKeySequence.StandardKey.SelectAll, self.page_list.selectAll)
         self.range_action = self._action(edit, "Seitenbereich auswählen …", "Ctrl+G", self.choose_page_range, "range")
-        self.duplicate_action = self._action(edit, "Auswahl duplizieren", "Ctrl+D", self.duplicate_pages, "duplicate")
-        self.delete_action = self._action(edit, "Auswahl entfernen", "Delete", self.delete_pages, "delete")
+        self.duplicate_action = self._action(edit, "Auswahl duplizieren", "Ctrl+D", self.duplicate_selection, "duplicate")
+        self.delete_action = self._action(edit, "Auswahl entfernen", "Delete", self.delete_selection, "delete")
         edit.addSeparator()
         self.move_up_action = self._action(edit, "Nach oben", "Alt+Up", lambda: self.move(-1), "up")
         self.move_down_action = self._action(edit, "Nach unten", "Alt+Down", lambda: self.move(1), "down")
@@ -293,6 +324,10 @@ class MainWindow(QMainWindow):
         self.comment_action = self._action(annotate, "Kommentar hinzufügen", None, lambda: self.set_annotation_tool("comment"), "comment")
         self.highlight_action = self._action(annotate, "Text markieren", None, lambda: self.set_annotation_tool("highlight"), "highlight")
         self.signature_action = self._action(annotate, "Gezeichnete Unterschrift …", None, self.choose_signature, "signature")
+        self.object_select_action = self._action(annotate, "Objekte auswählen und verschieben", None, lambda: self.set_annotation_tool("select"), "select")
+        self.edit_object_action = self._action(annotate, "Ausgewähltes Objekt bearbeiten …", None, self.edit_selected_object)
+        self.duplicate_object_action = self._action(annotate, "Ausgewähltes Objekt duplizieren", None, lambda: self.object_action("duplicate"), "duplicate")
+        self.delete_object_action = self._action(annotate, "Ausgewähltes Objekt löschen", None, lambda: self.object_action("delete"), "delete")
         annotate.addSeparator()
         self.annotations_action = self._action(annotate, "Anmerkungen bearbeiten oder löschen …", None, self.manage_annotations, "list")
         help_menu = self.menuBar().addMenu("&Hilfe"); self._action(help_menu, "Über PDF Workbench", None, self.about)
@@ -334,6 +369,7 @@ class MainWindow(QMainWindow):
         self.page_list.blockSignals(False)
         self.stack.setCurrentIndex(1 if self.workspace.pages else 0)
         self.selection_changed(); self.load_preview(); self.update_controls(); self._update_title()
+        self.search_bar.workspace_changed(self.workspace.pages)
         if ensure_visible and current:
             self.page_list.setFocus(Qt.FocusReason.OtherFocusReason)
             self.page_list.scrollToItem(current, QAbstractItemView.ScrollHint.EnsureVisible)
@@ -379,20 +415,45 @@ class MainWindow(QMainWindow):
         page = self._page_by_uid.get(self._active_uid)
         for widget in (self.annotations_button, self.annotations_action): widget.setEnabled(bool(page and page.annotations) and not busy)
         self.preview.canvas.setEnabled(not busy)
+        for widget in (self.object_select_button, self.insert_button, self.object_select_action, *self.object_actions): widget.setEnabled(has_pages and not busy)
+        for widget in (self.edit_object_action, self.duplicate_object_action, self.delete_object_action): widget.setEnabled(self.preview.selected_annotation is not None and not busy)
+        self.images_action.setEnabled(not busy)
+        self.search_action.setEnabled(has_pages and not self._closing_requested)
+        self.ocr_action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
+
+    def clear_search_hit(self):
+        self.preview.search_hit = None
+        self.preview.canvas.update()
+
+    def show_search_hit(self, hit):
+        if hit.page_uid not in self._page_by_uid: return
+        if not self.preview_toggle.isChecked():
+            self.preview_toggle.setChecked(True); self.toggle_preview()
+        for row in range(self.page_list.count()):
+            item = self.page_list.item(row)
+            if item.data(UID_ROLE) == hit.page_uid:
+                self.page_list.setCurrentItem(item, QItemSelectionModel.SelectionFlag.NoUpdate)
+                break
+        self.preview.search_hit = hit
+        self.preview.reveal_search_hit()
 
     def set_annotation_tool(self, tool, strokes=()):
         if self.job: return
         if not self.preview_toggle.isChecked():
             self.preview_toggle.setChecked(True); self.toggle_preview()
         self.preview.set_tool(tool, strokes)
-        {"pan": self.pan_button, "comment": self.comment_button, "highlight": self.highlight_button, "signature": self.signature_button}[tool].setChecked(True)
+        self._tool_button(tool).setChecked(True)
         hints = {
             "pan": "Hand: Seite mit gedrückter Maustaste verschieben. Seitliches Mausrad oder Umschalt+Mausrad scrollt horizontal; Strg+Mausrad zoomt.",
             "comment": "Kommentar: auf die gewünschte Stelle klicken. Zum Verschieben der Ansicht jederzeit die mittlere Maustaste verwenden.",
             "highlight": "Textmarkierung: über vorhandenen PDF-Text ziehen. Gescannte Seiten ohne Textschicht können so nicht markiert werden.",
             "signature": "Gezeichnete Unterschrift: einmal klicken für Standardgröße oder einen Bereich für die gewünschte Größe ziehen.",
+            "select": "Objekt anklicken und ziehen; an den Ecken die Größe ändern. Doppelklick bearbeitet, Esc bricht ab. Entf löscht nur das ausgewählte Objekt.",
         }
-        self.set_status(hints[tool])
+        self.set_status(hints.get(tool, "Auf die Seite klicken oder einen Bereich für das neue Objekt ziehen. Esc bricht die Platzierung ab."))
+
+    def _tool_button(self, tool):
+        return {"pan": self.pan_button, "select": self.object_select_button, "comment": self.comment_button, "highlight": self.highlight_button, "signature": self.signature_button}.get(tool, self.insert_button)
 
     def choose_signature(self):
         if self.job or not self.workspace.pages: return
@@ -400,7 +461,84 @@ class MainWindow(QMainWindow):
         if strokes:
             self.set_annotation_tool("signature", strokes)
         else:
-            {"pan": self.pan_button, "comment": self.comment_button, "highlight": self.highlight_button, "signature": self.signature_button}[self.preview.tool].setChecked(True)
+            self._tool_button(self.preview.tool).setChecked(True)
+
+    def _object_dialog(self, page_uid, kind, rect=None, annotation=None):
+        page = self._page_by_uid.get(page_uid)
+        if not page: return None
+        points, unit = source_page_geometry(self.workspace.sources[page.source_id], page)
+        values = dict(rotation=page.rotation, point_size=points, user_unit=unit)
+        if rect is not None: values['rect'] = rect
+        if kind == 'text': return TextObjectDialog.get_annotation(self, annotation, **values)
+        if kind in ('image', 'stamp'): return ImageObjectDialog.get_annotation(self, annotation, kind=kind, **values)
+        if kind in ('checkmark', 'cross'): return SymbolObjectDialog.get_annotation(self, annotation, kind=kind, **values)
+
+    def add_object(self, page_uid, kind, rect):
+        if self.job: return
+        try:
+            annotation = self._object_dialog(page_uid, kind, rect)
+            if annotation:
+                self.add_annotation(page_uid, annotation)
+                self.set_annotation_tool('select'); self.preview.set_selected_annotation(annotation.uid)
+                self.preview.canvas.setFocus()
+        except (ValueError, PdfWorkbenchError) as error: self.show_error('Objekt konnte nicht eingefügt werden.', str(error))
+
+    def update_annotation(self, page_uid, annotation):
+        if self.job or page_uid not in self._page_by_uid: return
+        try:
+            if annotation.kind == 'text':
+                page = self._page_by_uid[page_uid]
+                points, unit = source_page_geometry(self.workspace.sources[page.source_id], page)
+                validate_text_object(annotation, points, page.rotation, unit)
+            self.workspace.update_annotation(page_uid, annotation)
+            self.refresh(active_uid=page_uid)
+        except (ValueError, PdfWorkbenchError) as error: self.show_error('Objekt konnte nicht geändert werden.', str(error))
+
+    def edit_object(self, page_uid, annotation):
+        if self.job: return
+        try:
+            if annotation.kind in ('text', 'image', 'stamp', 'checkmark', 'cross'):
+                updated = self._object_dialog(page_uid, annotation.kind, annotation=annotation)
+            elif annotation.kind == 'signature':
+                strokes = SignatureDialog.get_strokes(self)
+                if not strokes: return
+                rotation = self._page_by_uid[page_uid].rotation
+                updated = replace(annotation, strokes=tuple(tuple(display_to_basis(point, rotation) for point in stroke) for stroke in strokes))
+            else:
+                text = CommentDialog.get_text(self, annotation.text, 'Anmerkung bearbeiten')
+                updated = replace(annotation, text=text) if text is not None else None
+            if updated: self.update_annotation(page_uid, updated)
+        except (ValueError, PdfWorkbenchError) as error: self.show_error('Objekt konnte nicht bearbeitet werden.', str(error))
+
+    def edit_selected_object(self):
+        if self.preview.page and self.preview.selected_annotation:
+            self.edit_object(self.preview.page.uid, self.preview.selected_annotation)
+
+    def object_action(self, action):
+        annotation, page = self.preview.selected_annotation, self.preview.page
+        if self.job or not annotation or not page: return
+        if action == 'edit': self.edit_object(page.uid, annotation)
+        elif action == 'delete':
+            self.workspace.remove_annotation(page.uid, annotation.uid); self.refresh(active_uid=page.uid)
+        elif action == 'duplicate':
+            left, top, right, bottom = annotation.rect
+            dx, dy = min(.025, 1-right), min(.025, 1-bottom)
+            shifted = tuple((a+dx,b+dy,c+dx,d+dy) for a,b,c,d in annotation.rects)
+            copy = replace(annotation, uid=uuid.uuid4().hex, rect=(left+dx,top+dy,right+dx,bottom+dy), rects=shifted)
+            self.add_annotation(page.uid, copy); self.preview.set_selected_annotation(copy.uid)
+
+    def _text_input_has_focus(self):
+        return isinstance(QApplication.focusWidget(), (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox))
+
+    def duplicate_selection(self):
+        if self._text_input_has_focus(): return
+        if self.preview.canvas.hasFocus() and self.preview.selected_annotation: self.object_action('duplicate')
+        elif not self.preview.canvas.hasFocus(): self.duplicate_pages()
+
+    def delete_selection(self):
+        if self._text_input_has_focus(): return
+        if self.preview.canvas.hasFocus() and self.preview.selected_annotation: self.object_action('delete')
+        elif not self.preview.canvas.hasFocus(): self.delete_pages()
 
     def add_annotation(self, page_uid, annotation):
         if self.job or page_uid not in self._page_by_uid: return
@@ -423,17 +561,7 @@ class MainWindow(QMainWindow):
         uid = self._active_uid
         def annotations():
             return self._page_by_uid[uid].annotations if uid in self._page_by_uid else ()
-        def edit(annotation):
-            if annotation.kind == "signature":
-                strokes = SignatureDialog.get_strokes(self)
-                if not strokes: return
-                rotation = self._page_by_uid[uid].rotation
-                updated = replace(annotation, strokes=tuple(tuple(display_to_basis(point, rotation) for point in stroke) for stroke in strokes))
-            else:
-                text = CommentDialog.get_text(self, annotation.text, "Kommentar bearbeiten" if annotation.kind == "comment" else "Textmarkierung: Notiz bearbeiten")
-                if text is None: return
-                updated = replace(annotation, text=text)
-            self.workspace.update_annotation(uid, updated); self.refresh(active_uid=uid)
+        def edit(annotation): self.edit_object(uid, annotation)
         def remove(annotation):
             self.workspace.remove_annotation(uid, annotation.uid); self.refresh(active_uid=uid)
         AnnotationListDialog(self, annotations, edit, remove).exec()
@@ -474,7 +602,14 @@ class MainWindow(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "PDFs hinzufügen", "", "PDF-Dateien (*.pdf);;Alle Dateien (*)", options=file_dialog_options())
         if files: self.import_files(files)
 
-    def import_files(self, files):
+    def import_images(self, checked=False, files=()):
+        if self.job: return
+        request = ImagePagesDialog.get_request(self, files)
+        if request:
+            paths, options = request
+            self.import_files(paths, options)
+
+    def import_files(self, files, image_options=None):
         if self.job or not files: return
         paths = list(dict.fromkeys(str(Path(path)) for path in files))
         def task(cancel, progress):
@@ -482,7 +617,13 @@ class MainWindow(QMainWindow):
             for index, path in enumerate(paths):
                 if cancel(): raise OperationCancelled()
                 progress(int(index / len(paths) * 100), f"{Path(path).name} öffnen …")
-                try: sources.append(load_source(path, cancel))
+                try:
+                    if Path(path).suffix.lower() in ('.png', '.jpg', '.jpeg'):
+                        source = load_image_source(path, image_options, cancel)
+                    else:
+                        source = load_source(path, cancel)
+                    source_page_geometry(source, PageRef('', source.source_id, 0))
+                    sources.append(source)
                 except OperationCancelled: raise
                 except Exception as error: errors.append(f"{Path(path).name}: {error}")
             return sources, errors
@@ -555,9 +696,17 @@ class MainWindow(QMainWindow):
             self.workspace.reorder(ordered_ids); self.refresh(ensure_visible=True)
 
     def undo(self):
+        if self._text_input_has_focus():
+            widget = QApplication.focusWidget()
+            if hasattr(widget, 'undo'): widget.undo()
+            return
         if not self.job: self.workspace.undo(); self.refresh(ensure_visible=True)
 
     def redo(self):
+        if self._text_input_has_focus():
+            widget = QApplication.focusWidget()
+            if hasattr(widget, 'redo'): widget.redo()
+            return
         if not self.job: self.workspace.redo(); self.refresh(ensure_visible=True)
 
     def _select_indices(self, indices):
@@ -603,6 +752,21 @@ class MainWindow(QMainWindow):
         def task(cancel, progress): return export_pages_separately(sources, pages, destination, cancel, progress)
         self.start_job(task, lambda saved: self.set_status(f"{len(pages)} einzelne PDFs gespeichert: {saved}"))
 
+    def save_searchable_pdf(self):
+        if self.job or not self.workspace.pages or self.preview.selection_pending: return
+        request = OcrDialog.get_request(self, len(self.workspace.pages), len(self.selected_ids()))
+        if request is None: return
+        selected = self.selected_ids()
+        pages = tuple(page for page in self.workspace.pages if request.scope == 'all' or page.uid in selected)
+        sources = dict(self.workspace.sources)
+        def task(cancel, progress):
+            return export_searchable_pdf(sources, pages, request.destination, engine=request.engine,
+                                         languages=request.languages, cache_dir=request.cache_dir,
+                                         dpi=request.dpi, timeout=request.timeout, cancel=cancel, progress=progress)
+        def success(result):
+            self.set_status(f'Durchsuchbare PDF gespeichert: {result.path} · {result.processed_pages} Seite(n) erkannt, {result.skipped_pages} mit vorhandener Textschicht übersprungen.')
+        self.start_job(task, success)
+
     def confirm_discard(self):
         if tuple(self.workspace.pages) == self.saved_state: return True
         return QMessageBox.question(self, "Ungespeicherte Änderungen verwerfen?", "Die aktuelle Seitenanordnung und ihre Anmerkungen wurden noch nicht vollständig als PDF gespeichert. Verwerfen?\n\nDie Originaldateien bleiben erhalten.", QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
@@ -617,16 +781,16 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if self.job:
             self.cancel_job(); self.set_status("Bitte den laufenden Abbruch abwarten und anschließend schließen."); event.ignore()
-        elif self.render_broker.is_closed:
+        elif self.render_broker.is_closed and self.search_bar.is_closed:
             event.accept()
         elif self._closing_requested:
             event.ignore()
         elif self.confirm_discard():
-            self._closing_requested = True; self.update_controls(); self.render_broker.shutdown(); event.ignore()
+            self._closing_requested = True; self.update_controls(); self.render_broker.shutdown(); self.search_bar.shutdown(); event.ignore()
         else: event.ignore()
 
     def _rendering_closed(self):
-        if self._closing_requested: self.close()
+        if self._closing_requested and self.render_broker.is_closed and self.search_bar.is_closed: self.close()
 
     def show_error(self, title, detail):
         self.set_status(title, "error")
@@ -636,7 +800,7 @@ class MainWindow(QMainWindow):
         box.exec()
 
     def about(self):
-        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Seitenverwaltung.<br><br>Zusammenfügen, duplizieren, trennen, drehen und sortieren.<br>Kommentare, echte Textmarkierungen und gezeichnete<br>Unterschriften; Miniaturen und Vorschau mit Zoom.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>Formulare und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
+        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>Formulare und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
 
     def dragEnterEvent(self, event):
         if not self.job and event.mimeData().hasUrls(): event.acceptProposedAction()

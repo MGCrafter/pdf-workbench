@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import math
 import os
+import stat
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -268,6 +269,21 @@ def _protect_destination(target: Path, sources: Mapping[str, SourceDocument]) ->
         raise PdfWorkbenchError("Eine Quelldatei darf nicht überschrieben werden. Wähle einen neuen Namen.")
 
 
+def _discard_partial(target: Path, identity: tuple[int, int] | None) -> str:
+    """Clean up a fallback output only while it is still the file we opened."""
+    try:
+        current = target.lstat()
+        if (identity is None or not identity[1] or not stat.S_ISREG(current.st_mode)
+                or (current.st_dev, current.st_ino) != identity):
+            return f"\nDas Ziel wurde inzwischen verändert. Eine fremde Datei bleibt erhalten; der Verbleib der eigenen Teildatei ist unbekannt. Letzter Pfad: {target}"
+        target.unlink()
+    except FileNotFoundError:
+        return f"\nDas Ziel wurde inzwischen entfernt oder verschoben. Letzter Pfad der eigenen Teildatei: {target}"
+    except OSError as error:
+        return f"\nNicht vollständig bereinigt: {target} ({error})"
+    return ""
+
+
 def export_pdf(
     sources: Mapping[str, SourceDocument],
     pages: Sequence[PageRef],
@@ -290,6 +306,7 @@ def export_pdf(
     _check_cancel(cancel)
     temporary: Path | None = None
     created_target = False
+    created_identity = None
     try:
         writer = PdfWriter()
         readers: dict[str, PdfReader] = {}
@@ -335,6 +352,8 @@ def export_pdf(
             # FAT and some network filesystems do not implement hard links.
             with target.open("xb") as output:
                 created_target = True
+                identity = os.fstat(output.fileno())
+                created_identity = identity.st_dev, identity.st_ino
                 with temporary.open("rb") as source_stream:
                     while chunk := source_stream.read(1024 * 1024):
                         _check_cancel(cancel)
@@ -344,18 +363,13 @@ def export_pdf(
         if progress:
             progress(100, "PDF gespeichert")
         return target
-    except AnnotationError as exc:
-        if created_target:
-            target.unlink(missing_ok=True)
-        raise PdfWorkbenchError(str(exc)) from exc
-    except (PdfWorkbenchError, OperationCancelled):
-        if created_target:
-            target.unlink(missing_ok=True)
-        raise
     except Exception as exc:
-        if created_target:
-            target.unlink(missing_ok=True)
-        raise PdfWorkbenchError(f"PDF konnte nicht gespeichert werden: {exc}") from exc
+        cleanup = _discard_partial(target, created_identity) if created_target else ""
+        if isinstance(exc, OperationCancelled):
+            raise OperationCancelled(("Vorgang abgebrochen." if cleanup else str(exc)) + cleanup) from exc
+        if isinstance(exc, (AnnotationError, PdfWorkbenchError)):
+            raise PdfWorkbenchError(str(exc) + cleanup) from exc
+        raise PdfWorkbenchError(f"PDF konnte nicht gespeichert werden: {exc}{cleanup}") from exc
     finally:
         if temporary:
             temporary.unlink(missing_ok=True)
