@@ -50,6 +50,10 @@ automatische Änderung eines Quellcode-Checkouts. Links im Programmordner werden
 abgewiesen. Die Pakete sind derzeit nicht mit einem Herausgeberzertifikat signiert;
 die Prüfung vertraut dem offiziellen GitHub-Release über HTTPS. Version 0.8 muss
 einmal manuell entpackt werden; deren Updater installiert anschließend künftige Versionen.
+Unter Windows dürfen Programm- und Updateordner kein Semikolon (`;`) enthalten:
+Der gebündelte Programmstarter kann daraus seine Python-DLL nicht laden. Unicode,
+Leerzeichen und Dokumentnamen mit Umlauten sind geprüft. Diese Einschränkung
+betrifft Installations- und Updatepfade, nicht allgemeine PDF-/Projektdateinamen.
 
 ## Lesezeichen
 

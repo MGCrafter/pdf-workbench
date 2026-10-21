@@ -23,6 +23,8 @@ macOS ist noch nicht getestet und hat derzeit kein Downloadpaket.
 **Windows:** Das ZIP vollständig entpacken und im entpackten Ordner
 `PDFWorkbench.exe` öffnen. Die mitgelieferten Dateien müssen im selben Ordner
 bleiben.
+Unter Windows darf der Programmordner kein Semikolon (`;`) enthalten;
+Umlaute und Leerzeichen funktionieren.
 
 **Linux:** Das Archiv entpacken und die App starten:
 

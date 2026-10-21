@@ -1,5 +1,57 @@
 # Tests
 
+## Lokale Abnahme 0.8
+
+Der Appstand `8778f12` besteht unter Linux **460 Tests ohne Fehler oder Skips**
+(60,345 Sekunden). Die daraus gebaute App besteht **23 PDF-Kerntests und
+45 GUI-Nachweise**, nativ auf Wayland. Zusätzlich bestehen 69 Release-/
+Publishingtests. Der Windows-Pfadschutz wird vor Netzwerk, Staging und
+Helferstart geprüft; fünf Paketierungstests sichern interne Bibliothekskopien
+und die Abweisung externer, zyklischer oder verzeichnisweiter Links ab.
+Ein unabhängiger Stresstest hat 144 echte Dialogöffnungen, 312 globale
+Themewechsel und 12 abgebrochene Schließversuche ohne Absturz durchlaufen.
+
+Neue PDF-Fälle prüfen unter anderem alle 16 Kombinationen aus intrinsischer
+und Arbeitsseitendrehung mit CropBox und UserUnit in Qt und Poppler,
+Formularansichten nach Skalierung und erneutem Ausfüllen sowie ausgewählte
+Kopien. Projekte werden mit echten eingebetteten PDFs, Objekten, Lesezeichen,
+Undo-/Redo-Historie und Verschlüsselung wieder geöffnet. Beschädigte Projekte,
+fehlende Originaldateien, parallele Zielersetzung, reine Undo-Sitzungen,
+Autosave-Rennen und Cleanupfehler haben eigene Verlustschutzprüfungen.
+
+Echte native Updateprozesse tauschen getrennte private Programmkopien von
+`0.7.99` gegen die unveränderte gebaute `0.8.0` aus. `0.7.99` ist ausschließlich
+ein Testfixture, keine veröffentlichte frühere Version. Die Abnahme prüft den
+lebenden alten Prozess, dessen Ende, einen erst nach Vorbereitung gespeicherten
+Projektstand mit zwei Seiten und 90°-Drehung sowie fremde Benutzerdateien.
+Ein zweites neues Paket ohne Qt-Platformplugins besteht die Programmprobe,
+scheitert aber beim echten GUI-Start: Der Helfer stellt dann die alte Kopie
+und deren Arbeit wieder her. Beide Fälle bestehen auf Linux und Windows, unter
+Windows auch aus einem Installationspfad mit Umlaut, Leerzeichen und wörtlichem
+`$()`. Eine native Sechs-Pfade-Matrix grenzt den Windows-Bootloaderfehler auf
+Semikolon in Runtimeordnern ein; der Updater weist diese vor Download und Übergabe ab.
+
+Die Windows-VM besteht 454 gemeldete Tests mit 74 ausdrücklich ausgewiesenen
+Skips/Subfällen; Quellcode und gebaute EXE bestehen je 23 Core- und 44 native
+GUI-Nachweise. In dieser VM fehlen Poppler und Tesseract; sechs POSIX-
+Executable-Fixtures und sieben Symlinkrechteprüfungen sind ebenfalls ausgenommen.
+Echte Windows-EXE-Exporte wurden zusätzlich auf dem Host mit Poppler geprüft.
+Die Plattformgrenzen bleiben im [Windows-Bericht für 0.8](windows-v08-testing.md)
+sichtbar. macOS ist weiterhin ungetestet.
+
+Diese lokalen Belege ersetzen nicht die separate native Abnahme der öffentlichen
+Releasepakete. Releasegates verlangen für 0.8 alle bisherigen GUI-Nachweise
+einschließlich echter OCR sowie die neuen Funktionen, 23 Coretests ohne Skips,
+passende native Qt-Plattformen und identische Appquellen beider Builder.
+Der vollständige [Releaseprobelauf für `8778f12`](https://github.com/MGCrafter/pdf-workbench/actions/runs/39657008581)
+besteht beide nativen Builds und die vollständige Quellenprüfung. Seine vier
+kleinen Builder-/Acceptance-Berichte wurden separat über begrenzte HTTP-Range-
+Abrufe geprüft: je 23 Core- und 45 GUI-Nachweise einschließlich echter OCR,
+native XCB-/Windows-Plattformen und alle 51 App-/Font-/Lizenzhashes passend zum
+Gitbaum. Große Pakete wurden für diese Metadatenprüfung nicht erneut geladen.
+
+## Vorherige Abnahmen
+
 Version 0.6 ergänzt Tests für echte AES-256-Dateien,
 Passwortwiederholung und Abbruch, Bildkomprimierung samt transparenten Bildern,
 AcroForm-Werte und sichtbare Felddarstellungen. Sie prüfen auch wiederholtes
