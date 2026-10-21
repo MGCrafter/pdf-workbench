@@ -183,6 +183,40 @@ class CollectorRetryTests(unittest.TestCase):
         self.assertEqual((self.directory/'demo.tar.xz').read_bytes(),data)
         self.assertFalse((self.directory/'demo.tar.xz.partial').exists())
 
+    def test_second_fully_cached_run_hydrates_missing_sizes_without_network(self):
+        data=b"verified source archive without an upstream declared size"
+        first=self.archive(data);first['size']=None
+        with patch.object(notices.urllib.request,"urlopen",return_value=Response(data)) as opened:
+            notices.download_sources([first],self.directory)
+        self.assertEqual(opened.call_count,1)
+        self.assertEqual(first['size'],len(data))
+        # A fresh source manifest is resolved for each release run; it can
+        # again contain an upstream digest with no declared byte count.
+        second=self.archive(data);second['size']=None
+        with patch.object(notices.urllib.request,"urlopen",side_effect=AssertionError("cache hit must stay offline")) as opened:
+            notices.download_sources([second],self.directory)
+        opened.assert_not_called()
+        self.assertEqual(second['size'],len(data))
+        self.assertEqual(second['sha256'],hashlib.sha256(data).hexdigest())
+        self.assertEqual(json.loads((self.directory/'source-manifest.json').read_text()),[second])
+        self.assertEqual((self.directory/'demo.tar.xz').read_bytes(),data)
+
+    def test_cached_digest_match_rejects_declared_size_mismatch_without_network(self):
+        data=b"hash-verified cached source must retain the declared size gate"
+        path=self.directory/'demo.tar.xz';path.write_bytes(data)
+        for declared_size in (0,len(data)+1):
+            with self.subTest(declared_size=declared_size):
+                item=self.archive(data);item['size']=declared_size
+                (self.directory/'source-manifest.json').write_text('stale success')
+                with patch.object(notices.urllib.request,"urlopen",side_effect=AssertionError("size mismatch must fail closed")) as opened:
+                    with self.assertRaisesRegex(notices.IncompleteNotices,'Source size mismatch'):
+                        notices.download_sources([item],self.directory)
+                opened.assert_not_called()
+                self.assertEqual(path.read_bytes(),data)
+                self.assertEqual(item['size'],declared_size)
+                self.assertFalse((self.directory/'source-manifest.json').exists())
+                self.assertFalse((self.directory/'demo.tar.xz.partial').exists())
+
     def test_archive_hash_and_expected_size_failures_are_not_retried_or_published(self):
         data=b"valid-looking wrong archive"
         for field in ('sha256','size'):

@@ -605,6 +605,10 @@ def download_sources(items: list[dict], destination: Path) -> None:
         temporary.unlink(missing_ok=True)
         expected = item["sha256"]
         if path.exists() and expected and sha256(path) == expected:
+            actual_size = path.stat().st_size
+            if item.get("size") is not None and item["size"] != actual_size:
+                raise IncompleteNotices(f"Source size mismatch: {filename}")
+            item.update(sha256=expected, size=actual_size)
             continue
         if urllib.parse.urlparse(item["url"]).scheme != "https":
             raise IncompleteNotices("Source archive URL must use HTTPS")

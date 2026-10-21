@@ -121,7 +121,12 @@ jobs:
                   item['filename'] = target.name
           for item in sources:
               path = root / item['filename']
-              if path.parent != root or not path.is_file() or path.stat().st_size != item['size']:
+              if path.parent != root or path.is_symlink() or not path.is_file():
+                  raise SystemExit('Missing or unsafe corresponding source asset')
+              measured_size = path.stat().st_size
+              declared_size = item['size']
+              if measured_size <= 0 or (declared_size is not None and
+                      (type(declared_size) is not int or declared_size != measured_size)):
                   raise SystemExit('Missing or incomplete corresponding source asset')
               with path.open('rb') as stream:
                   digest = hashlib.sha256()
@@ -129,6 +134,10 @@ jobs:
                       digest.update(chunk)
                   if digest.hexdigest() != item['sha256']:
                       raise SystemExit('Source asset checksum mismatch')
+              # Older cached manifests lack sizes for some hash-pinned sources.
+              # Fill only this unknown metadata, after verifying the exact bytes.
+              if declared_size is None:
+                  item['size'] = measured_size
           manifest_path.write_text(json.dumps(sources, indent=2) + '\n', encoding='utf-8')
           PY
           cd release-assets
