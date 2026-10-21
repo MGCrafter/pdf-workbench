@@ -19,8 +19,12 @@ def build_provenance(release: bool) -> dict:
         version = tomllib.load(stream)['project']['version']
     if version != __version__:
         raise ValueError('pyproject.toml and the app version differ.')
-    result = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True)
-    commit = result.stdout.strip() if result.returncode == 0 else None
+    try:
+        result = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True)
+    except FileNotFoundError:
+        commit = None
+    else:
+        commit = result.stdout.strip() if result.returncode == 0 else None
     if release:
         if commit is None:
             raise ValueError('A release requires a committed source checkout.')
@@ -40,7 +44,7 @@ def verify_notices(directory: Path) -> dict:
         raise ValueError('Release notices are incomplete; run packaging/collect_notices.py first.')
     from PyQt6.QtCore import qVersion
     versions = {'Qt': qVersion(), **{name: importlib.metadata.version(name) for name in
-                ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller')}}
+                ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography')}}
     for name, version in versions.items():
         if manifest.get('versions', {}).get(name) != version:
             raise ValueError(f'Notices describe a different {name} version.')
@@ -81,6 +85,7 @@ def main():
         '--paths', str(ROOT / 'packaging'),
         '--distpath', str(distpath), '--workpath', str(workpath), '--specpath', str(workpath),
         '--copy-metadata', 'pypdf', '--copy-metadata', 'PyQt6',
+        '--copy-metadata', 'Pillow', '--copy-metadata', 'cryptography',
         '--add-data', f'{ROOT / "LICENSE"}:.',
         '--add-data', f'{ROOT / "THIRD_PARTY_NOTICES.md"}:.',
         '--add-data', f'{provenance_path}:.',

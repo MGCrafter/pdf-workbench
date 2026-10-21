@@ -1,5 +1,18 @@
 # Tests
 
+Der Entwicklungsstand 0.6 ergänzt Tests für echte AES-256-Dateien,
+Passwortwiederholung und Abbruch, Bildkomprimierung samt transparenten Bildern,
+AcroForm-Werte und sichtbare Felddarstellungen. Sie prüfen auch wiederholtes
+Ausfüllen nach Merge, Duplikat, Seitendrehung und Export sowie den Ausschluss
+nicht exportierter Formularseiten und ihrer Daten. Poppler und Qt vergleichen
+die Darstellung unabhängig von pypdf. Die neue GUI-Abnahme prüft die Dialoge,
+800×560-Pixel-Fenster in beiden Themes und abschaltbare Animationen.
+
+Die konkreten lokalen Ergebnisse stehen im [Windows-Testbericht](windows-v06-testing.md).
+Die vollständige lokale Reviewchronik wird in `docs/review.md` geführt und nicht
+veröffentlicht. Die neuen Nachweise beschreiben Entwicklungsbuilds; die
+veröffentlichten Pakete bleiben bei 0.5.3.
+
 Die Tests erzeugen ihre PDFs selbst. Sie prüfen vor allem Dinge, bei denen ein
 Fehler Dokumente beschädigen oder Änderungen verlieren könnte: Originalschutz,
 Exportreihenfolge, Drehung, Wiederöffnen und das Löschen von Anmerkungen.

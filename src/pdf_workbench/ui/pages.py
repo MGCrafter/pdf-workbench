@@ -114,7 +114,7 @@ class PageList(QListWidget):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setAccessibleName("PDF-Seiten: Miniaturen in der Exportreihenfolge")
-        self.setAccessibleDescription("Blauer Rahmen: aktuelle Vorschau. Haken: für Werkzeuge ausgewählt. Mehrfachauswahl mit Strg/Cmd oder Umschalt, Verschieben mit Alt und Pfeiltasten.")
+        self.setAccessibleDescription("Rahmen: aktuelle Vorschau. Haken: für Werkzeuge ausgewählt. Mehrfachauswahl mit Strg/Cmd oder Umschalt, Verschieben mit Alt und Pfeiltasten.")
         self.set_grid_mode(True)
         broker.ready.connect(lambda *_: self.viewport().update())
 

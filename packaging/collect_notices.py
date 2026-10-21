@@ -207,7 +207,7 @@ def release_pins() -> dict[str, str]:
 
 def collect_distributions(output: Path) -> tuple[dict, list]:
     pins = release_pins()
-    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib"}
+    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib", "pillow", "cryptography"}
     versions, inventory = {}, []
     for dist in sorted(metadata.distributions(), key=lambda d: normalized_name(d.metadata.get("Name", ""))):
         name = dist.metadata.get("Name")
@@ -236,7 +236,7 @@ def collect_distributions(output: Path) -> tuple[dict, list]:
     if not required <= found:
         raise IncompleteNotices(f"Missing release distributions: {sorted(required-found)}")
     # Record predictable keys regardless of wheel metadata capitalization.
-    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib")}
+    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography")}
     from PyQt6.QtCore import qVersion, PYQT_VERSION_STR
     versions.update({"Qt": qVersion(), "Python": platform.python_version()})
     if versions["Qt"] != QT_VERSION or PYQT_VERSION_STR != versions["PyQt6"]:
@@ -315,7 +315,7 @@ def collect_system_notices(output: Path) -> None:
 
 def source_archives(versions: dict, lock: dict) -> list[dict]:
     result = [dict(lock["qt_source_archive"])]
-    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib"):
+    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography"):
         version = versions[package]
         data = json.loads(fetch(f"https://pypi.org/pypi/{package}/{version}/json"))
         sdists = [item for item in data["urls"] if item["packagetype"] == "sdist"]

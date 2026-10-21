@@ -72,6 +72,25 @@ class VectorIcon(QIconEngine):
         elif name == "range":
             painter.drawRoundedRect(QRectF(3, 4, 18, 16), 2, 2)
             p.moveTo(7, 9); p.lineTo(17, 9); p.moveTo(7, 15); p.lineTo(12, 15)
+        elif name == "lock":
+            painter.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2)
+            p.moveTo(8, 10); p.lineTo(8, 7); p.cubicTo(8, 1, 16, 1, 16, 7); p.lineTo(16, 10)
+            p.moveTo(12, 14); p.lineTo(12, 17)
+        elif name == "compress":
+            p.moveTo(3, 3); p.lineTo(9, 9); p.moveTo(9, 4); p.lineTo(9, 9); p.lineTo(4, 9)
+            p.moveTo(21, 21); p.lineTo(15, 15); p.moveTo(20, 15); p.lineTo(15, 15); p.lineTo(15, 20)
+            p.moveTo(15, 3); p.lineTo(21, 3); p.lineTo(21, 9); p.moveTo(3, 15); p.lineTo(3, 21); p.lineTo(9, 21)
+        elif name == "image":
+            painter.drawRoundedRect(QRectF(3, 4, 18, 16), 2, 2); painter.drawEllipse(QRectF(6, 7, 4, 4))
+            p.moveTo(3, 18); p.lineTo(9, 12); p.lineTo(13, 16); p.lineTo(17, 11); p.lineTo(21, 15)
+        elif name == "appearance":
+            painter.drawEllipse(QRectF(3, 3, 18, 18))
+            p.moveTo(12, 3); p.lineTo(12, 21)
+            painter.setBrush(foreground); painter.drawPie(QRectF(6, 6, 12, 12), -90*16, 180*16)
+        elif name == "form":
+            painter.drawRoundedRect(QRectF(3, 3, 18, 18), 2, 2)
+            painter.drawRoundedRect(QRectF(7, 7, 10, 4), 1, 1)
+            painter.drawRect(QRectF(7, 15, 3, 3)); p.moveTo(13, 16); p.lineTo(17, 16)
         elif name in ("zoom_in", "zoom_out"):
             painter.drawEllipse(QRectF(3, 3, 13, 13)); p.moveTo(14, 14); p.lineTo(21, 21)
             p.moveTo(6, 9.5); p.lineTo(13, 9.5)

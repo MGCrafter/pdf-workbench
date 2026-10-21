@@ -1,5 +1,18 @@
 # Änderungen
 
+## 0.6.0 (lokaler Entwicklungsstand, noch nicht veröffentlicht)
+
+- Neue Startansicht, ruhigere helle und dunkle Oberflächen, gruppierte Werkzeuge
+  und kurze Animationen. Unter Ansicht lassen sich Animationen abschalten;
+  erkannte Systemeinstellungen für reduzierte Bewegung werden berücksichtigt.
+- PDF-Komprimierung mit verlustfreier Optimierung und zwei Bildqualitätsstufen,
+  Größenvergleich vor dem Speichern und tatsächlicher Größe nach dem Export.
+- Passwortgeschützte PDFs öffnen und neue Dateien mit AES-256 schützen.
+  Der normale Export bleibt ausdrücklich unverschlüsselt.
+- Normale AcroForms mit Textfeldern, Kontrollkästchen und Einfachauswahl
+  ausfüllen. Undo, Seitensortierung, Duplikate und erneutes Öffnen sind geprüft.
+  XFA, Signaturfelder, Skripte und weitere Spezialfälle werden abgewiesen.
+
 ## 0.5.3
 
 - Die Texterkennung gibt temporäre PDF-Dateien vor dem Aufräumen vollständig

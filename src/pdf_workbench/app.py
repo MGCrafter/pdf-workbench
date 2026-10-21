@@ -19,7 +19,9 @@ from PyQt6.QtWidgets import (
 )
 
 from . import __version__
-from .core import OperationCancelled, PageRef, PdfWorkbenchError, Workspace, export_pdf, load_source
+from .core import (IncorrectPasswordError, OperationCancelled, PageRef, PasswordRequiredError,
+                   PdfWorkbenchError, Workspace, export_pdf, load_source)
+from .forms import fill_source_form, form_fields
 from .features import export_pages_separately, parse_page_selection
 from .ui.dialogs import PageRangeDialog, SeparateExportDialog
 from .ui.annotation_dialogs import AnnotationListDialog, CommentDialog, SignatureDialog
@@ -35,6 +37,9 @@ from .image_import import load_image_source
 from .ocr import export_searchable_pdf
 from .ui.ocr_dialog import OcrDialog
 from .ui.status import StatusLabel
+from .ui.motion import MotionController
+from .ui.welcome import WelcomeWorkspace
+from .ui.pdf_dialogs import CompressionDialog, FormDialog, PasswordDialog, size_text
 from .ui.theme import file_dialog_options, semantic_label, stylesheet, theme_controller
 
 
@@ -56,17 +61,22 @@ class Job(QThread):
             self.cancelled.emit(str(error) or "Vorgang abgebrochen.")
         except Exception as error:
             self.failed.emit(str(error))
+        finally:
+            self.task = None
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.theme = theme_controller()
+        self.motion = MotionController(self, self.theme.settings)
         self.workspace = Workspace()
         self.job = None
         self.saved_state = ()
         self._active_uid = None
         self._page_by_uid = {}
+        self._form_field_cache = {}
+        self._pending_locked_files = []
         self._closing_requested = False
         self.render_broker = RenderBroker(self)
         self.render_broker.closed.connect(self._rendering_closed)
@@ -74,7 +84,7 @@ class MainWindow(QMainWindow):
         screen = QApplication.primaryScreen()
         available = screen.availableGeometry().size() if screen else QSize(1200, 900)
         self.setMinimumSize(min(800, max(600, available.width() - 32)), min(560, max(440, available.height() - 48)))
-        self.resize(min(1160, available.width() - 32), min(780, available.height() - 48))
+        self.resize(min(1240, available.width() - 32), min(840, available.height() - 48))
         self.setAcceptDrops(True)
         self._build_ui()
         self._build_menu()
@@ -84,7 +94,7 @@ class MainWindow(QMainWindow):
 
     def _button(self, text, slot, symbol=None, primary=False):
         button = QPushButton(text)
-        button.setMinimumHeight(34)
+        button.setMinimumHeight(36)
         if symbol:
             button.setIcon(icon(symbol, "on_accent" if primary else None)); button.setIconSize(QSize(18, 18))
         if primary:
@@ -97,7 +107,7 @@ class MainWindow(QMainWindow):
         button.setIcon(icon(symbol)); button.setIconSize(QSize(19, 19))
         button.setText(label); button.setAccessibleName(label)
         button.setToolTip(label + (f" ({shortcut})" if shortcut else ""))
-        button.setMinimumSize(34, 34)
+        button.setMinimumSize(36, 36)
         if text:
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         button.clicked.connect(slot)
@@ -111,8 +121,12 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self):
         central = QWidget()
-        outer = QVBoxLayout(central); outer.setContentsMargins(18, 14, 18, 12); outer.setSpacing(12)
-        header = QHBoxLayout(); header.setSpacing(8)
+        outer = QVBoxLayout(central); outer.setContentsMargins(22, 18, 22, 14); outer.setSpacing(14)
+        header = QHBoxLayout(); header.setSpacing(10)
+        brand = QLabel(); brand.setObjectName("brandMark")
+        brand.setPixmap(icon("document", "on_accent").pixmap(QSize(26, 26)))
+        brand.setFixedSize(42, 42); header.addWidget(brand)
+        self.brand_mark = brand
         title = QLabel("PDF Workbench"); title.setObjectName("title")
         header.addWidget(title)
         self.source_summary = QLabel(); self.source_summary.setObjectName("muted")
@@ -124,9 +138,13 @@ class MainWindow(QMainWindow):
         header.addWidget(self._separator())
         self.open_button = self._button("PDFs hinzufügen …", self.open_dialog, "add")
         header.addWidget(self.open_button)
+        self.appearance_button = self._tool("Darstellung und Bewegung", "appearance", lambda: None)
+        self.appearance_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        header.addWidget(self.appearance_button)
         outer.addLayout(header)
 
         toolbar = QFrame(); toolbar.setObjectName("toolbar")
+        self.organize_toolbar = toolbar
         tools = QHBoxLayout(toolbar); tools.setContentsMargins(10, 6, 10, 6); tools.setSpacing(4)
         order_label = QLabel("Anordnen"); order_label.setObjectName("toolCaption"); tools.addWidget(order_label)
         self.up_button = self._tool("Nach oben verschieben", "up", lambda: self.move(-1), "Alt+↑")
@@ -143,6 +161,9 @@ class MainWindow(QMainWindow):
         self.range_button = self._tool("Bereich …", "range", self.choose_page_range, "Strg+G", text=True)
         tools.addWidget(self.range_button)
         tools.addStretch()
+        self.document_tools_button = self._tool("Werkzeuge", "form", lambda: None, text=True)
+        self.document_tools_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        tools.addWidget(self.document_tools_button)
         self.preview_toggle = self._tool("Vorschau", "preview", self.toggle_preview, text=True)
         self.preview_toggle.setCheckable(True); self.preview_toggle.setChecked(True)
         tools.addWidget(self.preview_toggle)
@@ -247,8 +268,14 @@ class MainWindow(QMainWindow):
         self.preview.annotation_selected.connect(lambda *_: self.update_controls())
         self.preview.annotation_edit_requested.connect(self.edit_object)
         self.preview.annotation_action.connect(self.object_action)
-        self.splitter.addWidget(self.preview_panel); self.splitter.setHandleWidth(14); self.splitter.setSizes([465, 660])
-        outer.addWidget(self.splitter, 1)
+        self.splitter.addWidget(self.preview_panel); self.splitter.setHandleWidth(18); self.splitter.setSizes([365, 810])
+        left.setMinimumWidth(275); self.preview_panel.setMinimumWidth(350)
+        self.workspace_stack = QStackedWidget()
+        self.welcome_workspace = WelcomeWorkspace(self.open_dialog, self.import_images)
+        self.empty_open_button = self.welcome_workspace.open_button
+        self.workspace_stack.addWidget(self.welcome_workspace)
+        self.workspace_stack.addWidget(self.splitter)
+        outer.addWidget(self.workspace_stack, 1)
 
         footer = QFrame(); footer.setObjectName("footer")
         footer_layout = QHBoxLayout(footer); footer_layout.setContentsMargins(0, 10, 0, 0); footer_layout.setSpacing(8)
@@ -287,6 +314,8 @@ class MainWindow(QMainWindow):
         self.split_action = self._action(file_menu, "Auswahl als neue PDF speichern …", "Ctrl+Shift+E", lambda: self.save_pdf(True), "export")
         self.separate_action = self._action(file_menu, "Auswahl als einzelne PDFs speichern …", None, self.save_separate_pages, "separate")
         self.ocr_action = self._action(file_menu, "Durchsuchbare PDF erstellen (OCR) …", None, self.save_searchable_pdf, "document")
+        self.compress_action = self._action(file_menu, "PDF komprimieren …", None, self.compress_pdf, "compress")
+        self.protect_action = self._action(file_menu, "Mit Passwort geschützt speichern …", None, self.protect_pdf, "lock")
         file_menu.addSeparator(); self._action(file_menu, "Beenden", QKeySequence.StandardKey.Quit, self.close)
         edit = self.menuBar().addMenu("&Bearbeiten")
         self.undo_action = self._action(edit, "Rückgängig", QKeySequence.StandardKey.Undo, self.undo, "undo")
@@ -319,6 +348,12 @@ class MainWindow(QMainWindow):
             self.theme_group.addAction(action); appearance.addAction(action)
             self.theme_actions[mode] = action
         self._sync_theme_actions()
+        self.reduce_motion_action = QAction("Bewegung reduzieren", self)
+        self.reduce_motion_action.setCheckable(True); self.reduce_motion_action.setChecked(self.motion.reduced)
+        self.reduce_motion_action.setToolTip("Deaktiviert Übergänge und die Animation beim Start. Die Einstellung wird gespeichert.")
+        self.reduce_motion_action.toggled.connect(self.motion.set_reduced)
+        appearance.addSeparator(); appearance.addAction(self.reduce_motion_action)
+        self.appearance_button.setMenu(appearance)
         annotate = self.menuBar().addMenu("&Anmerkungen")
         self.pan_action = self._action(annotate, "Hand: Seite verschieben", None, lambda: self.set_annotation_tool("pan"), "hand")
         self.comment_action = self._action(annotate, "Kommentar hinzufügen", None, lambda: self.set_annotation_tool("comment"), "comment")
@@ -330,7 +365,14 @@ class MainWindow(QMainWindow):
         self.delete_object_action = self._action(annotate, "Ausgewähltes Objekt löschen", None, lambda: self.object_action("delete"), "delete")
         annotate.addSeparator()
         self.annotations_action = self._action(annotate, "Anmerkungen bearbeiten oder löschen …", None, self.manage_annotations, "list")
+        self.form_action = self._action(annotate, "Formular ausfüllen …", "Ctrl+Shift+F", self.fill_form, "form")
         help_menu = self.menuBar().addMenu("&Hilfe"); self._action(help_menu, "Über PDF Workbench", None, self.about)
+        document_tools = QMenu(self.document_tools_button)
+        document_tools.addAction(self.images_action); document_tools.addSeparator()
+        document_tools.addAction(self.form_action); document_tools.addAction(self.ocr_action)
+        document_tools.addSeparator(); document_tools.addAction(self.compress_action); document_tools.addAction(self.protect_action)
+        self.document_tools_menu = document_tools
+        self.document_tools_button.setMenu(document_tools)
 
     def _sync_theme_actions(self, *_):
         self.theme_actions[self.theme.preference].setChecked(True)
@@ -339,6 +381,8 @@ class MainWindow(QMainWindow):
         self.empty_document.setPixmap(icon("document", "muted").pixmap(QSize(42, 42)))
         self.page_list.viewport().update()
         self.preview.canvas.update()
+        self.brand_mark.setPixmap(icon("document", "on_accent").pixmap(QSize(26, 26)))
+        self.welcome_workspace.refresh_icons()
 
     def selected_ids(self):
         return {item.data(UID_ROLE) for item in self.page_list.selectedItems()}
@@ -368,6 +412,8 @@ class MainWindow(QMainWindow):
         if current: self.page_list.setCurrentItem(current, QItemSelectionModel.SelectionFlag.NoUpdate)
         self.page_list.blockSignals(False)
         self.stack.setCurrentIndex(1 if self.workspace.pages else 0)
+        self.workspace_stack.setCurrentIndex(1 if self.workspace.pages else 0)
+        self.organize_toolbar.setVisible(bool(self.workspace.pages))
         self.selection_changed(); self.load_preview(); self.update_controls(); self._update_title()
         self.search_bar.workspace_changed(self.workspace.pages)
         if ensure_visible and current:
@@ -391,7 +437,8 @@ class MainWindow(QMainWindow):
         source = self.workspace.sources[page.source_id]
         position = next(i for i, p in enumerate(self.workspace.pages, 1) if p.uid == page.uid)
         self.active_label.setText(f"Seite {position} von {len(self.workspace.pages)}")
-        self.page_details.setText(f"{source.label} · Originalseite {page.page_index + 1} · +{page.rotation}°")
+        self.page_details.setText(f"{source.label} · Originalseite {page.page_index + 1} · +{page.rotation}°" +
+                                  (" · Entsperrt; normaler Export ohne Passwort" if source.was_encrypted else ""))
         self.page_details.setToolTip(str(source.path))
         self.preview.show_page(source, page)
         self.annotations_button.setText(f"Anmerkungen ({len(page.annotations)}) …")
@@ -420,6 +467,16 @@ class MainWindow(QMainWindow):
         self.images_action.setEnabled(not busy)
         self.search_action.setEnabled(has_pages and not self._closing_requested)
         self.ocr_action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
+        for action in (self.compress_action, self.protect_action):
+            action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
+        source = self.workspace.sources[page.source_id] if page else None
+        if source and source.source_id not in self._form_field_cache:
+            self._form_field_cache[source.source_id] = bool(form_fields(source))
+        self.form_action.setEnabled(bool(source and self._form_field_cache.get(source.source_id)) and not busy)
+        self.welcome_workspace.images_button.setEnabled(not busy)
+        self.document_tools_button.setEnabled(not busy)
+        for button in (self.separate_button, self.split_button, self.export_button):
+            button.setVisible(has_pages)
 
     def clear_search_hit(self):
         self.preview.search_hit = None
@@ -568,12 +625,12 @@ class MainWindow(QMainWindow):
 
     def selection_changed(self):
         count, sources = len(self.workspace.pages), len({p.source_id for p in self.workspace.pages})
-        self.source_summary.setText(
+        self.source_summary.setText((
             f"{count} {'Seite' if count == 1 else 'Seiten'} · "
             f"{sources} {'Datei' if sources == 1 else 'Dateien'}"
-        )
+        ) if count else "Ihr Platz für gute Dokumente")
         current = self.page_list.currentRow() + 1
-        self.summary.setText(f"{len(self.selected_ids())} ausgewählt" + (f" · Blauer Rahmen: Vorschau Seite {current}" if current else " · Strg/Cmd oder Umschalt für Mehrfachauswahl"))
+        self.summary.setText(f"{len(self.selected_ids())} ausgewählt" + (f" · Vorschau: Seite {current}" if current else " · Strg/Cmd oder Umschalt für Mehrfachauswahl"))
         self.update_controls()
 
     def set_view_mode(self, grid):
@@ -609,11 +666,12 @@ class MainWindow(QMainWindow):
             paths, options = request
             self.import_files(paths, options)
 
-    def import_files(self, files, image_options=None):
+    def import_files(self, files, image_options=None, passwords=None):
         if self.job or not files: return
         paths = list(dict.fromkeys(str(Path(path)) for path in files))
+        passwords = {} if passwords is None else dict(passwords)
         def task(cancel, progress):
-            sources, errors = [], []
+            sources, errors, locked = [], [], []
             for index, path in enumerate(paths):
                 if cancel(): raise OperationCancelled()
                 progress(int(index / len(paths) * 100), f"{Path(path).name} öffnen …")
@@ -621,24 +679,57 @@ class MainWindow(QMainWindow):
                     if Path(path).suffix.lower() in ('.png', '.jpg', '.jpeg'):
                         source = load_image_source(path, image_options, cancel)
                     else:
-                        source = load_source(path, cancel)
+                        source = load_source(path, cancel, password=passwords.get(path))
                     source_page_geometry(source, PageRef('', source.source_id, 0))
                     sources.append(source)
                 except OperationCancelled: raise
+                except (PasswordRequiredError, IncorrectPasswordError) as error:
+                    locked.append((path, isinstance(error, IncorrectPasswordError)))
                 except Exception as error: errors.append(f"{Path(path).name}: {error}")
-            return sources, errors
+            passwords.clear()
+            return sources, errors, locked
         def success(result):
-            sources, errors = result
+            sources, errors, locked = result
             if sources:
                 selected = self.workspace.add_sources(sources)
                 self.refresh(selected, selected[0], ensure_visible=True)
             self.set_status(f"{len(sources)} Datei(en) hinzugefügt.")
+            if any(source.was_encrypted for source in sources):
+                self.set_status("Geschützte PDF geöffnet. Normaler Export ist unverschlüsselt; das Werkzeug „Mit Passwort schützen“ erstellt eine geschützte neue PDF.", "warning")
+            self._pending_locked_files = locked
             if errors: self.show_error("Einige Dateien konnten nicht geöffnet werden.", "\n\n".join(errors))
         self.start_job(task, success)
+
+    def _request_import_passwords(self):
+        pending, self._pending_locked_files = self._pending_locked_files, []
+        if self._closing_requested: return
+        passwords = {}
+        for path, incorrect in pending:
+            password = PasswordDialog.get_password(self, source_name=Path(path).name, incorrect=incorrect)
+            if password is not None: passwords[path] = password
+        if passwords:
+            self.import_files(list(passwords), passwords=passwords)
+            passwords.clear()
 
     def set_status(self, text, tone="normal"):
         self.status.setText(text); self.status.setToolTip(text)
         semantic_label(self.status, tone)
+        if not self.job: self.motion.feedback(self.status)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_welcome_animated", False):
+            self._welcome_animated = True
+            self.motion.animate(self.welcome_workspace.artwork, "reveal", 0., 1., 460)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if not hasattr(self, "source_summary"): return
+        compact = self.width() < 1020
+        self.welcome_workspace.adapt(self.height())
+        self.source_summary.setVisible(not compact)
+        for button in (self.fit_page_button, self.fit_width_button, self.annotations_button):
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly if compact else Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
     def start_job(self, task, success):
         job = Job(task, self); self.job = job
@@ -666,6 +757,8 @@ class MainWindow(QMainWindow):
         job, self.job = self.job, None
         self.progress.hide(); self.cancel_button.hide(); self.update_controls()
         if job: job.deleteLater()
+        if self._pending_locked_files:
+            QTimer.singleShot(0, self._request_import_passwords)
 
     def move(self, direction):
         if not self.job:
@@ -721,7 +814,7 @@ class MainWindow(QMainWindow):
         indices = PageRangeDialog.get_selection(self, len(self.workspace.pages))
         if indices is not None: self._select_indices(indices)
 
-    def save_pdf(self, selected_only):
+    def save_pdf(self, selected_only, *, password=None, optimization=None):
         if self.job: return
         if self.preview.selection_pending:
             self.set_status("Bitte die laufende PDF-Textauswahl abwarten oder das Werkzeug wechseln."); return
@@ -729,15 +822,54 @@ class MainWindow(QMainWindow):
         pages = [page for page in self.workspace.pages if not selected_only or page.uid in selected]
         if not pages: return
         title = "Ausgewählte Seiten als neue PDF speichern" if selected_only else "Alle Seiten als neue PDF speichern"
+        if password is not None: title = "Mit Passwort geschützte neue PDF speichern"
+        elif any(self.workspace.sources[page.source_id].was_encrypted for page in pages): title = "Neue PDF ohne Passwortschutz speichern"
         filename, _ = QFileDialog.getSaveFileName(self, title, "auswahl.pdf" if selected_only else "zusammengefuegt.pdf", "PDF-Dateien (*.pdf)", options=QFileDialog.Option.DontConfirmOverwrite | file_dialog_options())
         if not filename: return
         path = Path(filename)
         if not path.suffix: path = path.with_suffix(".pdf")
         sources, snapshot = dict(self.workspace.sources), tuple(self.workspace.pages)
-        def task(cancel, progress): return export_pdf(sources, pages, path, cancel, progress)
+        reports = []
+        export_options = {}
+        if password is not None: export_options["password"] = password
+        if optimization is not None:
+            export_options.update(optimization=optimization, compression_report=reports.append)
+        def task(cancel, progress): return export_pdf(sources, pages, path, cancel, progress, **export_options)
         def success(saved):
             if tuple(pages) == snapshot: self.saved_state = snapshot; self._update_title()
-            self.set_status(f"{len(pages)} Seite(n) gespeichert: {saved}")
+            detail = " · Mit AES-256 geschützt" if password is not None else ""
+            if reports:
+                report = reports[-1]
+                detail += f" · {size_text(report.baseline_bytes)} → {size_text(report.output_bytes)} ({report.saved_percent:.1f} % kleiner)"
+            self.set_status(f"{len(pages)} Seite(n) gespeichert: {saved}{detail}")
+        self.start_job(task, success)
+
+    def compress_pdf(self):
+        if self.job or not self.workspace.pages or self.preview.selection_pending: return
+        options = CompressionDialog.get_options(self, dict(self.workspace.sources), tuple(self.workspace.pages))
+        if options is not None: self.save_pdf(False, optimization=options)
+
+    def protect_pdf(self):
+        if self.job or not self.workspace.pages or self.preview.selection_pending: return
+        password = PasswordDialog.get_password(self)
+        if password is not None: self.save_pdf(False, password=password)
+
+    def fill_form(self):
+        if self.job or self._active_uid not in self._page_by_uid: return
+        page = self._page_by_uid[self._active_uid]
+        source = self.workspace.sources[page.source_id]
+        values = FormDialog.get_values(self, source)
+        if not values: return
+        selected, active = self.selected_ids(), self._active_uid
+        def task(cancel, progress):
+            if cancel(): raise OperationCancelled()
+            result = fill_source_form(source, values)
+            if cancel(): raise OperationCancelled()
+            return result
+        def success(updated):
+            self.workspace.replace_source(source.source_id, updated)
+            self.refresh(selected, active)
+            self.set_status("Formular ausgefüllt. Mit „PDF speichern“ in eine neue Datei übernehmen. Rückgängig ist verfügbar.")
         self.start_job(task, success)
 
     def save_separate_pages(self):
@@ -774,6 +906,7 @@ class MainWindow(QMainWindow):
     def new_workspace(self):
         if not self.job and self.confirm_discard():
             self.workspace = Workspace(); self.saved_state = (); self._active_uid = None
+            self._pending_locked_files = []; self._form_field_cache.clear()
             self.preview.set_tool("pan"); self.pan_button.setChecked(True)
             self.render_broker.invalidate(clear_cache=True); self.refresh()
             self.set_status("Neuer Arbeitsbereich. PDFs können hinzugefügt werden.")
@@ -800,7 +933,7 @@ class MainWindow(QMainWindow):
         box.exec()
 
     def about(self):
-        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>Formulare und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
+        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Komprimierung, Passwortschutz und normale AcroForms<br>mit Textfeldern, Kontrollkästchen und einfacher Auswahl.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>XFA, Skripte und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
 
     def dragEnterEvent(self, event):
         if not self.job and event.mimeData().hasUrls(): event.acceptProposedAction()

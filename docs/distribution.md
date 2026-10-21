@@ -5,6 +5,20 @@ Python 3.14.8 and exact versions in `packaging/requirements-release.txt`.
 Local CachyOS bundles and their historical license inventory are development
 artifacts, not the portable public binaries.
 
+## Unpublished 0.6 development builds
+
+The current local Windows development ZIP is an onedir test build, not a public
+release. No public tags or assets were changed. Pillow and cryptography are now
+runtime dependencies: their exact versions and original wheel notices are
+recorded, and release notice/source collection includes both packages.
+
+Before a public 0.6 release, audit the native libraries newly collected from
+their wheels (including any transitive bundled libraries) and record the
+matching notices and source providers. The Ubuntu native-source gate remains
+strict: an unknown wheel-provided library fails the release rather than being
+assumed covered by the application's or CPython's source. The local functional
+tests and Windows development EXE do not establish that release source audit.
+
 ## Release materials
 
 The app release contains only the two native onedir archives and their
@@ -36,7 +50,7 @@ the app and the development host do not.
 ## Notice and source gates
 
 Run the collector in the clean native build environment after tests and removal
-of the test-only ReportLab/Pillow dependencies:
+of the test-only ReportLab dependency (Pillow remains part of the runtime):
 
 ```sh
 python packaging/collect_notices.py --output build/release-notices

@@ -20,6 +20,7 @@ from pypdf import PdfReader, PdfWriter
 
 from . import __version__
 from .annotations import AnnotationError, PageAnnotation, add_pdf_annotations, extract_own_annotations
+from .compression import CompressionOptions, CompressionReport, compress_writer
 
 
 class PdfWorkbenchError(Exception):
@@ -28,6 +29,14 @@ class PdfWorkbenchError(Exception):
 
 class OperationCancelled(PdfWorkbenchError):
     """The operation was cancelled before committing its output."""
+
+
+class PasswordRequiredError(PdfWorkbenchError):
+    """An encrypted input requires a password supplied by the user."""
+
+
+class IncorrectPasswordError(PdfWorkbenchError):
+    """The supplied password did not unlock the encrypted input."""
 
 
 CancelCheck = Callable[[], bool]
@@ -47,6 +56,8 @@ class SourceDocument:
     page_count: int
     page_sizes: tuple[tuple[float, float], ...]
     page_annotations: tuple[tuple[PageAnnotation, ...], ...] = ()
+    was_encrypted: bool = False
+    original_size: int = 0
 
     @property
     def label(self) -> str:
@@ -67,7 +78,8 @@ class PageRef:
             raise PdfWorkbenchError("Eine Seitenanmerkung ist ungültig.")
 
 
-def load_source(path: str | Path, cancel: CancelCheck | None = None) -> SourceDocument:
+def load_source(path: str | Path, cancel: CancelCheck | None = None, *,
+                password: str | None = None) -> SourceDocument:
     """Read a complete snapshot; reject currently unsupported PDF features."""
     source_path = Path(path).expanduser().resolve()
     try:
@@ -77,44 +89,40 @@ def load_source(path: str | Path, cancel: CancelCheck | None = None) -> SourceDo
                 _check_cancel(cancel)
                 chunks.append(chunk)
         data = b"".join(chunks)
+        original_size = len(data)
         _check_cancel(cancel)
         reader = PdfReader(io.BytesIO(data), strict=False)
-        if reader.is_encrypted:
-            raise PdfWorkbenchError(
-                "Verschlüsselte PDFs werden derzeit nicht unterstützt. "
-                "Bitte verwende eine unverschlüsselte Kopie, die du bearbeiten darfst."
-            )
+        was_encrypted = reader.is_encrypted
+        if was_encrypted:
+            if password is None:
+                raise PasswordRequiredError("Diese PDF ist verschlüsselt. Bitte gib das Öffnungspasswort ein.")
+            try:
+                unlocked = reader.decrypt(password)
+            except Exception:
+                raise PdfWorkbenchError("Die Verschlüsselung dieser PDF konnte nicht geöffnet werden.") from None
+            if not unlocked:
+                raise IncorrectPasswordError("Das Passwort ist falsch. Bitte versuche es erneut.")
+            _check_cancel(cancel)
         root = reader.trailer["/Root"]
-        acroform = root.get("/AcroForm")
-        if acroform:
-            fields = acroform.get_object()
-            if fields.get("/Fields") or fields.get("/XFA"):
-                raise PdfWorkbenchError(
-                    "Diese PDF enthält interaktive Formularfelder oder digitale Signaturen. "
-                    "Derzeit werden nur normale Dokumentseiten verarbeitet."
-                )
+        from .forms import prepare_form_appearances, validate_forms
+        validate_forms(reader)
         if root.get("/Perms"):
             raise PdfWorkbenchError("PDFs mit digitalen Zertifikatssignaturen werden derzeit nicht unterstützt.")
+        normalized_form = prepare_form_appearances(reader)
+        if normalized_form is not None:
+            data = normalized_form
+            reader = PdfReader(io.BytesIO(data), strict=False)
         if not len(reader.pages):
             raise PdfWorkbenchError("Die PDF enthält keine Seiten.")
         sizes = []
         for page in reader.pages:
             _check_cancel(cancel)
-            # Orphaned widgets can exist without a document-level form tree.
-            annotations = page.get("/Annots", [])
-            if hasattr(annotations, "get_object"):
-                annotations = annotations.get_object()
-            for annotation in annotations:
-                if annotation.get_object().get("/Subtype") == "/Widget":
-                    raise PdfWorkbenchError(
-                        "Diese PDF enthält Formularfelder. Sie werden derzeit nicht unterstützt."
-                    )
             size = (float(page.mediabox.width), float(page.mediabox.height))
             if any(not math.isfinite(value) or value <= 0 for value in size):
                 raise PdfWorkbenchError("Diese PDF enthält eine Seite mit ungültigen Abmessungen (MediaBox).")
             sizes.append(size)
         page_annotations, stripped = extract_own_annotations(reader)
-        if stripped:
+        if stripped or was_encrypted:
             _check_cancel(cancel)
             base = PdfWriter()
             base.clone_document_from_reader(reader)
@@ -122,7 +130,8 @@ def load_source(path: str | Path, cancel: CancelCheck | None = None) -> SourceDo
             base.write(stream)
             data = stream.getvalue()
         _check_cancel(cancel)
-        return SourceDocument(uuid4().hex, source_path, data, len(sizes), tuple(sizes), page_annotations)
+        return SourceDocument(uuid4().hex, source_path, data, len(sizes), tuple(sizes), page_annotations,
+                              was_encrypted, original_size)
     except (PdfWorkbenchError, OperationCancelled):
         raise
     except OSError as exc:
@@ -165,6 +174,19 @@ class Workspace:
             )) for i in range(source.page_count))
         self._set([*self.pages, *new_pages])
         return [page.uid for page in new_pages]
+
+    def replace_source(self, source_id: str, new_source: SourceDocument) -> None:
+        """Replace an immutable snapshot while keeping undoable page identity."""
+        old_source = self.sources.get(source_id)
+        if old_source is None or new_source.page_count != old_source.page_count:
+            raise PdfWorkbenchError("Das neue Dokument muss dieselbe Seitenanzahl besitzen.")
+        if new_source.source_id in self.sources and self.sources[new_source.source_id] != new_source:
+            raise PdfWorkbenchError("Die neue Dokumentkennung wird bereits verwendet.")
+        if new_source.source_id == source_id and new_source != old_source:
+            raise PdfWorkbenchError("Ein bearbeitetes Dokument benötigt eine neue Kennung.")
+        self.sources[new_source.source_id] = new_source
+        self._set([replace(page, source_id=new_source.source_id)
+                   if page.source_id == source_id else page for page in self.pages])
 
     def reorder(self, ordered_ids: Sequence[str]) -> None:
         if len(ordered_ids) != len(self.pages) or set(ordered_ids) != {p.uid for p in self.pages}:
@@ -284,12 +306,114 @@ def _discard_partial(target: Path, identity: tuple[int, int] | None) -> str:
     return ""
 
 
+def _build_writer(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
+                  title: str, cancel: CancelCheck | None = None,
+                  progress: Progress | None = None) -> PdfWriter:
+    from .forms import copy_page_fields, page_has_fields
+    if not pages:
+        raise PdfWorkbenchError("Bitte wähle mindestens eine Seite aus.")
+    writer = PdfWriter()
+    readers: dict[str, PdfReader] = {}
+    imported_pages: set[tuple[str, int]] = set()
+    for index, page in enumerate(pages):
+        _check_cancel(cancel)
+        source = sources.get(page.source_id)
+        if source is None or not 0 <= page.page_index < source.page_count or page.rotation % 90:
+            raise PdfWorkbenchError("Eine ausgewählte Seite ist ungültig.")
+        if page.source_id not in readers:
+            readers[page.source_id] = PdfReader(io.BytesIO(source.data))
+        reader = readers[page.source_id]
+        source_page = reader.pages[page.page_index]
+        identity = (page.source_id, page.page_index)
+        if identity in imported_pages:
+            writer.reset_translation(reader)
+        # Cloning form parents and their Kids can accidentally embed pages the
+        # user excluded. Rebuild supported fields from the selected widgets.
+        added = (writer.add_page(source_page, excluded_keys=("/Annots",))
+                 if page_has_fields(source_page) else writer.add_page(source_page))
+        copy_page_fields(writer, added, reader, source_page, namespace=page.source_id)
+        imported_pages.add(identity)
+        add_pdf_annotations(writer, added, source_page, page.annotations, page.rotation)
+        if page.rotation:
+            added.rotate(page.rotation)
+        if progress:
+            progress(int((index + 1) / len(pages) * 85),
+                     f"Seite {index + 1} von {len(pages)} vorbereiten …")
+    writer.add_metadata({"/Producer": f"PDF Workbench {__version__} (pypdf)", "/Title": title})
+    return writer
+
+
+def _encrypted_bytes(data: bytes, password: str) -> bytes:
+    try:
+        valid = isinstance(password, str) and bool(password) and len(password.encode("utf-8")) <= 127
+    except UnicodeError:
+        valid = False
+    if not valid:
+        raise PdfWorkbenchError("Bitte verwende ein Passwort mit 1 bis 127 UTF-8-Bytes.")
+    try:
+        writer = PdfWriter(clone_from=io.BytesIO(data))
+        writer.encrypt(password, algorithm="AES-256")
+        stream = io.BytesIO()
+        writer.write(stream)
+        return stream.getvalue()
+    except Exception:
+        # Do not let an encryption provider or password-validation error put
+        # the supplied secret into logs or a user-visible exception.
+        raise PdfWorkbenchError("Der AES-256-Passwortschutz konnte nicht erzeugt werden.") from None
+
+
+def _serialize_output(writer: PdfWriter, options: CompressionOptions | None,
+                      password: str | None, cancel: CancelCheck | None,
+                      progress: Progress | None) -> tuple[bytes, CompressionReport | None]:
+    _check_cancel(cancel)
+    baseline = None
+    if options is not None and password is not None:
+        stream = io.BytesIO()
+        writer.write(stream)
+        baseline = _encrypted_bytes(stream.getvalue(), password)
+    if options is not None:
+        data, report = compress_writer(writer, options, cancel, progress)
+    else:
+        stream = io.BytesIO()
+        writer.write(stream)
+        data, report = stream.getvalue(), None
+    _check_cancel(cancel)
+    if password is not None:
+        data = _encrypted_bytes(data, password)
+        if report is not None and baseline is not None:
+            if len(data) >= len(baseline):
+                data = baseline
+                report = replace(report, images_changed=0)
+            report = replace(report, baseline_bytes=len(baseline), output_bytes=len(data))
+    _check_cancel(cancel)
+    return data, report
+
+
+def preview_compression(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
+                        options: CompressionOptions, cancel: CancelCheck | None = None,
+                        progress: Progress | None = None) -> CompressionReport:
+    """Measure an in-memory export; creates no temporary or destination file."""
+    try:
+        writer = _build_writer(sources, pages, "Komprimierungsvorschau", cancel, progress)
+        _, report = _serialize_output(writer, options, None, cancel, progress)
+        assert report is not None
+        return report
+    except PdfWorkbenchError:
+        raise
+    except Exception as exc:
+        raise PdfWorkbenchError(f"Komprimierung konnte nicht vorbereitet werden: {exc}") from exc
+
+
 def export_pdf(
     sources: Mapping[str, SourceDocument],
     pages: Sequence[PageRef],
     destination: str | Path,
     cancel: CancelCheck | None = None,
     progress: Progress | None = None,
+    *,
+    password: str | None = None,
+    optimization: CompressionOptions | None = None,
+    compression_report: Callable[[CompressionReport], None] | None = None,
 ) -> Path:
     """Write selected pages in their current order, safely creating a fresh PDF.
 
@@ -308,39 +432,21 @@ def export_pdf(
     created_target = False
     created_identity = None
     try:
-        writer = PdfWriter()
-        readers: dict[str, PdfReader] = {}
-        imported_pages: set[tuple[str, int]] = set()
-        for index, page in enumerate(pages):
-            _check_cancel(cancel)
-            source = sources.get(page.source_id)
-            if source is None or not 0 <= page.page_index < source.page_count or page.rotation % 90:
-                raise PdfWorkbenchError("Eine ausgewählte Seite ist ungültig.")
-            if page.source_id not in readers:
-                readers[page.source_id] = PdfReader(io.BytesIO(source.data))
-            identity = (page.source_id, page.page_index)
-            if identity in imported_pages:
-                # add_page creates an independent page dictionary, but its
-                # clone cache otherwise shares annotations and their /P link.
-                writer.reset_translation(readers[page.source_id])
-            added = writer.add_page(readers[page.source_id].pages[page.page_index])
-            imported_pages.add(identity)
-            add_pdf_annotations(writer, added, readers[page.source_id].pages[page.page_index], page.annotations, page.rotation)
-            if page.rotation:
-                added.rotate(page.rotation)
-            if progress:
-                progress(int((index + 1) / len(pages) * 85), f"Seite {index + 1} von {len(pages)} vorbereiten …")
-        writer.add_metadata({"/Producer": f"PDF Workbench {__version__} (pypdf)", "/Title": target.stem})
+        writer = _build_writer(sources, pages, target.stem, cancel, progress)
+        data, report = _serialize_output(writer, optimization, password, cancel, progress)
         descriptor, name = tempfile.mkstemp(prefix=".pdf-workbench-", suffix=".tmp", dir=target.parent)
         temporary = Path(name)
         with os.fdopen(descriptor, "wb") as stream:
-            writer.write(stream)
+            stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
         _check_cancel(cancel)
         # Parse the generated file before publishing it to the chosen path.
         with temporary.open("rb") as stream:
-            if len(PdfReader(stream).pages) != len(pages):
+            checked = PdfReader(stream)
+            if password is not None and not checked.decrypt(password):
+                raise PdfWorkbenchError("Der Passwortschutz der gespeicherten PDF konnte nicht geprüft werden.")
+            if len(checked.pages) != len(pages):
                 raise PdfWorkbenchError("Die PDF konnte nicht vollständig gespeichert werden.")
         _check_cancel(cancel)
         _protect_destination(target, sources)
@@ -360,6 +466,8 @@ def export_pdf(
                         output.write(chunk)
                 output.flush()
                 os.fsync(output.fileno())
+        if compression_report and report is not None:
+            compression_report(report)
         if progress:
             progress(100, "PDF gespeichert")
         return target

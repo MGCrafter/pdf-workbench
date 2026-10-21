@@ -22,11 +22,13 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(APP_ROOT / "src"))
 
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject
+from pypdf.generic import ArrayObject, DecodedStreamObject, DictionaryObject, NameObject, NumberObject, TextStringObject
 from pdf_workbench import __version__
 from pdf_workbench.annotations import PageAnnotation
 from pdf_workbench.core import OperationCancelled, PdfWorkbenchError, Workspace, export_pdf, load_source
 from pdf_workbench.features import export_pages_separately, parse_page_selection
+from pdf_workbench.compression import CompressionOptions
+from pdf_workbench.forms import fill_source_form, form_fields
 
 
 def fixture(path: Path, labels=("A1", "A2", "A3"), rotation=0, crop=False, annotation=False):
@@ -151,7 +153,7 @@ class PdfAcceptance(unittest.TestCase):
         with self.assertRaises(PdfWorkbenchError): self.export()
         self.assertEqual(self.out.read_bytes(), self.original_a)
 
-    def test_encrypted_and_widget_rejected(self):
+    def test_password_required_and_orphaned_widget_rejected(self):
         writer = PdfWriter()
         writer.add_page(PdfReader(self.a).pages[0])
         writer.encrypt("test-password")
@@ -163,6 +165,60 @@ class PdfAcceptance(unittest.TestCase):
         page[NameObject("/Annots")] = ArrayObject([writer._add_object(widget)])
         writer.write(self.out)
         with self.assertRaises(PdfWorkbenchError): load_source(self.out)
+
+    def test_aes256_and_image_compression_runtime(self):
+        # This runs inside the frozen app too, exercising both native providers.
+        from PIL import Image
+        image = Image.new("RGB", (2400, 100), (180, 120, 80))
+        writer = PdfWriter()
+        page = writer.add_blank_page(300, 500)
+        raster = DecodedStreamObject()
+        raster.set_data(image.tobytes())
+        raster.update({NameObject("/Type"): NameObject("/XObject"), NameObject("/Subtype"): NameObject("/Image"),
+                       NameObject("/Width"): NumberObject(image.width), NameObject("/Height"): NumberObject(image.height),
+                       NameObject("/ColorSpace"): NameObject("/DeviceRGB"), NameObject("/BitsPerComponent"): NumberObject(8)})
+        page[NameObject("/Resources")] = DictionaryObject({NameObject("/XObject"): DictionaryObject({NameObject("/Scan"): writer._add_object(raster)})})
+        content = DecodedStreamObject(); content.set_data(b"q 300 0 0 100 0 200 cm /Scan Do Q")
+        page[NameObject("/Contents")] = writer._add_object(content)
+        scan = self.directory / "scan.pdf"; writer.write(scan)
+        workspace = Workspace(); workspace.add_sources([load_source(scan)])
+        reports = []
+        export_pdf(workspace.sources, workspace.pages, self.out, password="acceptance-only",
+                   optimization=CompressionOptions("balanced"), compression_report=reports.append)
+        reader = PdfReader(self.out)
+        self.assertTrue(reader.is_encrypted)
+        self.assertEqual(reader.decrypt("wrong"), 0)
+        self.assertTrue(reader.decrypt("acceptance-only"))
+        self.assertEqual(reader.trailer["/Encrypt"]["/Length"], 256)
+        self.assertLess(reader.pages[0].images[0].image.width, 2400)
+        self.assertGreater(reports[0].saved_bytes, 0)
+        source = load_source(self.out, password="acceptance-only")
+        self.assertTrue(source.was_encrypted)
+        self.assertFalse(PdfReader(io.BytesIO(source.data)).is_encrypted)
+
+    def test_acroform_fill_export_reopen_runtime(self):
+        writer = PdfWriter(clone_from=self.a)
+        font = DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+                                 NameObject("/BaseFont"): NameObject("/Helvetica"), NameObject("/Encoding"): NameObject("/WinAnsiEncoding")})
+        widget = DictionaryObject({NameObject("/Type"): NameObject("/Annot"), NameObject("/Subtype"): NameObject("/Widget"),
+                                   NameObject("/FT"): NameObject("/Tx"), NameObject("/T"): TextStringObject("answer"),
+                                   NameObject("/V"): TextStringObject("Before"), NameObject("/DA"): TextStringObject("/Helv 12 Tf 0 g"),
+                                   NameObject("/Rect"): ArrayObject(NumberObject(n) for n in (30, 300, 250, 330))})
+        field = writer._add_object(widget)
+        writer.pages[0][NameObject("/Annots")] = ArrayObject([field])
+        writer._root_object[NameObject("/AcroForm")] = writer._add_object(DictionaryObject({
+            NameObject("/Fields"): ArrayObject([field]),
+            NameObject("/DR"): DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/Helv"): writer._add_object(font)})})}))
+        path = self.directory / "form.pdf"; writer.write(path)
+        original = path.read_bytes()
+        source = fill_source_form(load_source(path), {"answer": "Grüße aus Wien"})
+        workspace = Workspace(); workspace.add_sources([source])
+        export_pdf(workspace.sources, workspace.pages[:1], self.out)
+        reopened = load_source(self.out)
+        self.assertEqual(form_fields(reopened)[0].value, "Grüße aus Wien")
+        again = fill_source_form(reopened, {"answer": "Again"})
+        self.assertEqual(form_fields(again)[0].value, "Again")
+        self.assertEqual(path.read_bytes(), original)
 
     def test_duplicate_rotation_and_single_undo(self):
         original = list(self.ws.pages)

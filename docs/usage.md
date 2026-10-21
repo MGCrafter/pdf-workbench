@@ -6,7 +6,7 @@
 direkt ins Fenster ziehen. Die Seiten erscheinen zunächst in Importreihenfolge.
 Über den Raster- und Listenschalter wechselst du zwischen den Miniaturansichten.
 
-Der blaue Rahmen markiert die aktuelle Vorschauseite. Häkchen und blaue Fläche
+Der hervorgehobene Rahmen markiert die aktuelle Vorschauseite. Häkchen und getönte Fläche
 zeigen die Auswahl für die Werkzeuge. Mit Strg und Umschalt lassen sich mehrere
 Seiten auswählen. **Bereich …** versteht beispielsweise `1-3, 5, 8-10`; die
 Nummern beziehen sich auf die aktuelle Reihenfolge. Wiederholte Angaben werden
@@ -100,6 +100,61 @@ Die App speichert die Auswahl. Mit **System** folgt die Oberfläche dem hellen
 oder dunklen Erscheinungsbild des Betriebssystems, auch wenn es während der
 Benutzung wechselt. Ein manueller Wechsel verändert weder die PDF-Farben noch
 Zoom, Scrollposition oder den Verlauf deiner Änderungen.
+
+**Ansicht → Bewegung reduzieren** schaltet die kurzen Übergänge ab. Diese
+Einstellung bleibt gespeichert. Unter Windows und GNOME berücksichtigt die App
+auch erkannte Systemeinstellungen für reduzierte Bewegung.
+
+## Komprimieren und Passwortschutz
+
+Unter **Werkzeuge → PDF komprimieren …** stehen drei Stufen bereit:
+verlustfreie Optimierung sowie **Ausgewogen** und **Klein**. Die beiden letzteren
+können normale RGB- und Graustufenbilder verkleinern und als JPEG neu speichern;
+die längste Kante ist dann höchstens 2.200 beziehungsweise 1.400 Pixel lang.
+Text und Vektoren werden nicht gerastert. Maskierte, farbprofilabhängige und
+andere spezielle Bilder bleiben unverändert. Das kann die Ersparnis begrenzen.
+
+Der Größenvergleich berechnet einen Probeexport im Arbeitsspeicher. Er vergleicht
+die aktuelle Seitenanordnung mit und ohne Komprimierung, nicht die Summe der
+Quelldateigrößen. Dateiname und Metadaten können die endgültige Größe geringfügig
+ändern. Nach dem Speichern zeigt die Statuszeile die tatsächlichen Größen.
+Prüfe bei Bildkomprimierung das Erscheinungsbild vor der Weitergabe. Die App
+speichert das kleinere Ergebnis und erstellt immer eine neue Datei.
+
+Bei einer geschützten PDF fragt die App nach dem Öffnungspasswort. Ein falsches
+Passwort lässt sich erneut eingeben; Abbrechen lässt bereits importierte Dateien
+im Arbeitsbereich. Die entschlüsselten Dokumentdaten liegen während der Sitzung
+im Speicher. Das Passwort wird nicht in Einstellungen oder Quelldaten-Snapshots
+gespeichert.
+
+**Werkzeuge → Mit Passwort geschützt speichern …** speichert alle Arbeitsseiten mit
+AES-256-Verschlüsselung in einer neuen PDF. Das Passwort muss zweimal eingegeben
+werden. Normales Speichern, Einzelseiten, Komprimieren und OCR erzeugen
+unverschlüsselte Dateien; der Passwortschutz einer Quelle wird nicht automatisch
+übernommen. Es werden keine getrennten Druck- oder Bearbeitungsrechte vergeben.
+
+## Vorhandene PDF-Formulare ausfüllen
+
+Eine Seite der gewünschten Quelldatei aktivieren und **Werkzeuge → Formular
+ausfüllen …** wählen. Der Dialog zeigt alle unterstützten Felder dieser Quelle:
+normale Textfelder, Kontrollkästchen und Einfachauswahl. Die Änderung gilt auch
+für ihre duplizierten Arbeitsseiten und lässt sich gemeinsam rückgängig machen.
+Erst **PDF speichern …** schreibt sie in eine neue Datei. Unterstützte Felder
+bleiben nach Export und Wiederöffnen ausfüllbar; bei zusammengefügten Formularen
+werden kollidierende Namen eindeutig umbenannt.
+
+Die App erzeugt beim Ausfüllen beziehungsweise bei einer angeforderten
+Neudarstellung eigene Feldansichten aus den Formularwerten. Normale
+Hintergrundfarben und rechteckige Rahmen bleiben erhalten; aufwendige
+Dekorrahmen oder spezielle Schrifteffekte können vereinfacht werden.
+
+Schreibgeschützte Felder und Längenbegrenzungen werden berücksichtigt. Wenn die
+PDF-Schrift ein eingegebenes Zeichen nicht darstellen kann, lehnt die App die
+Änderung ab. XFA, Signaturfelder, Skripte und Berechnungen, Optionsschalter,
+Aktionsschaltflächen, Passwort- und Richtextfelder, editierbare Auswahl und
+Mehrfachauswahl sowie mehrdeutige oder nicht seitengebundene Felder gehören noch
+nicht zum unterstützten Umfang. Das Erstellen neuer interaktiver Felder ist
+ebenfalls noch nicht verfügbar.
 
 ## Textfelder, Bilder und Stempel
 

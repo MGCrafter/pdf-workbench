@@ -259,6 +259,21 @@ class BuildProvenanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build.build_provenance(release=True)
 
+    def test_development_build_without_git_keeps_source_hashes_and_no_commit(self):
+        with patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")):
+            provenance = build.build_provenance(release=False)
+        self.assertIsNone(provenance["source_commit"])
+        self.assertEqual(provenance["source_sha256"], {
+            "src/pdf_workbench/__init__.py": hashlib.sha256(self.source.read_bytes()).hexdigest(),
+        })
+        self.git_status.assert_not_called()
+
+    def test_missing_git_does_not_authorize_a_release_build(self):
+        with patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")):
+            with self.assertRaisesRegex(ValueError, "committed source checkout"):
+                build.build_provenance(release=True)
+        self.git_status.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

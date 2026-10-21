@@ -28,8 +28,9 @@ Wenn der Zielordner währenddessen verschoben oder ersetzt wurde, wird der
 Verbleib der bereits erzeugten Dateien ausdrücklich als unbekannt mit den
 zuletzt bekannten Pfaden angegeben; der Ersatzordner wird nicht bereinigt.
 
-Die bestehenden Grenzen gelten weiter: verschlüsselte PDFs, Formulare und
-digitale Zertifikatssignaturen werden abgewiesen. Dokumentweite Lesezeichen, Anhänge, PDF/A-Konformität
+Die Grenzen für Spezialformulare und digitale Zertifikatssignaturen gelten weiter.
+Öffnungspasswörter und normale AcroForms werden ab Version 0.6 unterstützt;
+Details stehen in [Bedienung](usage.md). Dokumentweite Lesezeichen, Anhänge, PDF/A-Konformität
 und interne Verweise über neu zusammengesetzte oder getrennte Seiten werden nicht
 als vollständig erhalten zugesagt. Seiten mit nichtpositiven oder nichtendlichen
 MediaBox-Abmessungen werden vor dem Import abgewiesen; normale abweichende
