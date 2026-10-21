@@ -77,7 +77,7 @@ class OcrDialog(QDialog):
         self._close_when_idle = False
         self.available_languages = set(cached_languages(self.cache_dir))
         layout = QVBoxLayout(self)
-        intro = QLabel("Texterkennung mit lokalem Tesseract. Es wird eine zusätzliche PDF mit unsichtbarer Textschicht gespeichert. Die vorhandenen Seiteninhalte und Originaldateien bleiben erhalten.")
+        intro = QLabel("Texterkennung mit lokalem Tesseract. Es wird eine zusätzliche PDF mit unsichtbarer Textschicht gespeichert. Die vorhandenen Seiteninhalte und Originaldateien bleiben erhalten. Die neue Datei wird ohne Passwortschutz gespeichert.")
         intro.setWordWrap(True); layout.addWidget(intro)
         form = QFormLayout()
         self.scope = QComboBox(); self.scope.setAccessibleName("Seiten für die Texterkennung")

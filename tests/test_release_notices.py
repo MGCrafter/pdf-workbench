@@ -122,7 +122,7 @@ class ReleaseNoticeTests(unittest.TestCase):
 
     def test_native_source_descriptor_binds_complete_exact_version_source_set(self):
         inventory = {'schema_version': 1, 'packages': [{'source_package': 'demo', 'source_version': '1.2-0ubuntu1'}]}
-        with patch.object(notices, 'fetch', side_effect=self.native_api()):
+        with patch.object(notices, '_ubuntu_pool_sources', return_value=None), patch.object(notices, 'fetch', side_effect=self.native_api()):
             result = notices.ubuntu_source_archives(inventory)
         self.assertEqual(len(result), 3)
         orig = next(item for item in result if item['filename'].endswith('.orig.tar.xz'))
@@ -132,7 +132,7 @@ class ReleaseNoticeTests(unittest.TestCase):
     def test_native_source_descriptor_rejects_wrong_version_and_missing_archive(self):
         inventory = {'schema_version': 1, 'packages': [{'source_package': 'demo', 'source_version': '1.2-0ubuntu1'}]}
         for response in (self.native_api('Source: demo\nVersion: 1.3-newer\n'), self.native_api(include_original=False)):
-            with patch.object(notices, 'fetch', side_effect=response), self.assertRaises(notices.IncompleteNotices):
+            with patch.object(notices, '_ubuntu_pool_sources', return_value=None), patch.object(notices, 'fetch', side_effect=response), self.assertRaises(notices.IncompleteNotices):
                 notices.ubuntu_source_archives(inventory)
 
     def test_parallel_source_metadata_remains_complete_and_rejects_one_bad_descriptor(self):
@@ -153,7 +153,7 @@ class ReleaseNoticeTests(unittest.TestCase):
                 name = parsed.path.rsplit('/', 1)[-1].split('_', 1)[0]
                 version = '2.0' if wrong and name == 'beta' else '1.0'
                 return (f'Source: {name}\nVersion: {version}\nChecksums-Sha256:\n ' + 'a'*64 + f' 123 {name}_1.0.orig.tar.xz\n').encode()
-            with patch.object(notices, 'fetch', side_effect=response):
+            with patch.object(notices, '_ubuntu_pool_sources', return_value=None), patch.object(notices, 'fetch', side_effect=response):
                 if wrong:
                     with self.assertRaises(notices.IncompleteNotices):
                         notices.ubuntu_source_archives({'schema_version': 1, 'packages': packages})

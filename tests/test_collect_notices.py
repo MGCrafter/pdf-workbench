@@ -239,7 +239,7 @@ class CollectorRetryTests(unittest.TestCase):
                    Response(b'Source: demo\nVersion: 2.0-wrong\nChecksums-Sha256:\n '+b'a'*64+b' 123 demo_1.0.orig.tar.xz\n')]
         with patch.object(notices.urllib.request,'urlopen',side_effect=responses) as opened:
             with self.assertRaisesRegex(notices.IncompleteNotices,'does not match'):
-                notices._ubuntu_package_sources({'source_package':'demo','source_version':'1.0'})
+                notices._launchpad_package_sources({'source_package':'demo','source_version':'1.0'})
         self.assertEqual(opened.call_count,3)
         self.sleep.assert_not_called()
 

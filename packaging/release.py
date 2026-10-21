@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build import verify_notices
 from collect_notices import verify_bundle
+from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS
 
 
 def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, source_hashes: dict) -> dict:
@@ -50,6 +51,11 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
                     'local OCR searchable text and preserved image'}
         if not required <= set(gui.get('checks', [])):
             raise ValueError('A complete native object/search/image/OCR acceptance is required for this version.')
+    if tuple(int(part) for part in version.split('.')[:2]) >= (0, 6):
+        if core.get('tests', 0) < 15 or not V06_CORE_CHECKS <= set(core.get('checks', [])):
+            raise ValueError('Complete native password/compression/form PDF acceptance is required.')
+        if not V06_GUI_CHECKS <= set(gui.get('checks', [])):
+            raise ValueError('Complete native password/compression/form/motion GUI acceptance is required.')
     return report
 
 
@@ -82,7 +88,7 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                 'platform': target, 'architecture': 'x86_64',
                 'python': platform.python_version(), 'libc': platform.libc_ver(),
                 'packages': {name: importlib.metadata.version(name) for name in
-                             ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller')},
+                             ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography', 'cffi')},
                 'source_sha256': source_hashes,
                 'executable_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
                 'acceptance': {'core': report['core'], 'gui_checks': report['gui']['checks'],
@@ -102,6 +108,9 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                     'Strg+F sucht Text. Unter Datei lassen sich Bilder als PDF-Seiten übernehmen.\n'
                     'Datei > Durchsuchbare PDF erstellen nutzt optional eine lokale Tesseract-Installation.\n'
                     'Ansicht > Darstellung bietet System, Hell und Dunkel.\n'
+                    'Werkzeuge bietet PDF-Komprimierung, Passwortschutz und das Ausfüllen vorhandener Formulare.\n'
+                    'Normale Exporte übernehmen einen Quellpasswortschutz nicht automatisch.\n'
+                    'Ansicht > Darstellung > Bewegung reduzieren schaltet kurze Animationen ab.\n'
                     'PDF speichern schreibt eine neue Datei; Originale werden nicht geändert.\n\n'
                     'Anleitung: https://github.com/MGCrafter/pdf-workbench#loslegen\n'
                     'Quellcode und Drittanbieterquellen: https://github.com/MGCrafter/pdf-workbench/releases\n')

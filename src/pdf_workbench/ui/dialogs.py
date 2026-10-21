@@ -68,7 +68,7 @@ class SeparateExportDialog(QDialog):
         self.setWindowTitle("Auswahl als einzelne PDFs speichern")
         self.setMinimumWidth(460)
         layout = QVBoxLayout(self); layout.setContentsMargins(24, 24, 24, 20); layout.setSpacing(14)
-        intro = QLabel(f"{page_count} ausgewählte Seite(n) werden als nummerierte PDF-Dateien in einem neuen Unterordner gespeichert.")
+        intro = QLabel(f"{page_count} ausgewählte Seite(n) werden als nummerierte PDF-Dateien in einem neuen Unterordner gespeichert. Die neuen Dateien werden ohne Passwortschutz gespeichert.")
         intro.setWordWrap(True); layout.addWidget(intro)
         form = QFormLayout(); form.setSpacing(10)
         self.parent_edit = QLineEdit(str(Path.home() / "Documents" if (Path.home() / "Documents").is_dir() else Path.home()))

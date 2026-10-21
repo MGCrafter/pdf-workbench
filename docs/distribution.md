@@ -5,6 +5,28 @@ Python 3.14.8 and exact versions in `packaging/requirements-release.txt`.
 Local CachyOS bundles and their historical license inventory are development
 artifacts, not the portable public binaries.
 
+## Version 0.6 runtime audit
+
+Pillow, cryptography and CFFI are runtime dependencies with exact version pins.
+Each builder records its installed native extensions and their authenticated
+wheel RECORD hashes in `runtime-wheels.json`. The source job merges both
+platform inventories; it does not assume Windows uses the Linux codec versions.
+Original Rust/CFFI/OpenSSL notices and complete matching sources supplement
+the original wheel notice corpus. The Windows Pillow codec audit is described
+in [runtime-v06-audit.md](runtime-v06-audit.md).
+
+Linux builds Pillow and CFFI from their pinned source distributions against
+Ubuntu development libraries. The collected system ELFs retain the existing
+exact dpkg source-package audit. Only explicitly identified, hash-matching
+native extensions receive a corresponding Python-package source provider;
+unknown sibling libraries still fail. The unused AVIF plugin/native extension
+is excluded from the bundle. Source archives are acquired and checked in the
+cloud, with verified downloads cached for retries.
+
+The 0.6 package gate requires named password/compression/form PDF tests and
+GUI workflows, including reduced motion, from the actual frozen executable.
+A local development ZIP or source-only test is not a public release acceptance.
+
 ## Release materials
 
 The app release contains only the two native onedir archives and their
@@ -25,7 +47,8 @@ third-party sources. The official archive size is 1,019,661,552 bytes, below
 GitHub's per-asset limit. Its official SHA-256 is
 `6dcfbca271d76a6502741a2c0dc6fc98ef7dd0b7b4cfd0abcebb285a86a26f33`.
 The source job also collects exact-version PyQt6, SIP-runtime, pypdf,
-PyInstaller and hooks source distributions. CPython sources are an additional
+PyInstaller, hooks, Pillow, cryptography and CFFI source distributions, plus
+the matching bundled native/Rust dependencies. CPython sources are an additional
 rebuild convenience; the PSF license does not require a source offer.
 
 The manifest distinguishes upstream-provided digests (Qt/PyPI) from CPython's
@@ -36,7 +59,7 @@ the app and the development host do not.
 ## Notice and source gates
 
 Run the collector in the clean native build environment after tests and removal
-of the test-only ReportLab/Pillow dependencies:
+of the test-only ReportLab dependency (Pillow remains part of the runtime):
 
 ```sh
 python packaging/collect_notices.py --output build/release-notices

@@ -131,6 +131,30 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             self.write_report(report)
             self.assertEqual(self.verify(target), report)
 
+    def test_v06_requires_all_named_core_and_gui_checks_on_both_platforms(self):
+        self.version = self.provenance['app_version'] = '0.6.0'
+        previous = ['appearance dark/light/system', 'appearance persisted',
+                    'appearance preserves document and viewport', 'appearance document/export colors',
+                    'appearance dialogs and icons', 'objects select/move/duplicate/delete/undo',
+                    'objects text/image/stamp/symbol PDF roundtrip', 'objects bundled font and Unicode',
+                    'asynchronous text search', 'images to PDF and undo',
+                    'local OCR searchable text and preserved image']
+        for target, platform_name in (('linux', 'xcb'), ('win32', 'windows')):
+            report, _ = self.prepare(target, platform_name)
+            report['core'].update(tests=15, checks=sorted(release.V06_CORE_CHECKS))
+            report['gui']['checks'] = previous + sorted(release.V06_GUI_CHECKS)
+            self.write_report(report); self.assertEqual(self.verify(target), report)
+            for section, required in (('core', release.V06_CORE_CHECKS), ('gui', release.V06_GUI_CHECKS)):
+                for missing in required:
+                    invalid = copy.deepcopy(report)
+                    invalid[section]['checks'].remove(missing)
+                    self.write_report(invalid)
+                    with self.subTest(target=target, section=section, missing=missing), self.assertRaises(ValueError):
+                        self.verify(target)
+            invalid = copy.deepcopy(report); invalid['core']['tests'] = 14
+            self.write_report(invalid)
+            with self.assertRaises(ValueError): self.verify(target)
+
     def test_previous_build_cannot_be_released_as_a_different_checkout(self):
         self.prepare()
         identities = {
@@ -258,6 +282,21 @@ class BuildProvenanceTests(unittest.TestCase):
         with patch.object(build.subprocess, "run", return_value=subprocess.CompletedProcess([], 128, "", "no git checkout")):
             with self.assertRaises(ValueError):
                 build.build_provenance(release=True)
+
+    def test_development_build_without_git_keeps_source_hashes_and_no_commit(self):
+        with patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")):
+            provenance = build.build_provenance(release=False)
+        self.assertIsNone(provenance["source_commit"])
+        self.assertEqual(provenance["source_sha256"], {
+            "src/pdf_workbench/__init__.py": hashlib.sha256(self.source.read_bytes()).hexdigest(),
+        })
+        self.git_status.assert_not_called()
+
+    def test_missing_git_does_not_authorize_a_release_build(self):
+        with patch.object(build.subprocess, "run", side_effect=FileNotFoundError("git")):
+            with self.assertRaisesRegex(ValueError, "committed source checkout"):
+                build.build_provenance(release=True)
+        self.git_status.assert_not_called()
 
 
 if __name__ == "__main__":

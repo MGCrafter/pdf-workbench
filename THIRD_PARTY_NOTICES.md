@@ -10,12 +10,18 @@ Third-party components retain their own copyrights and licenses.
 | Qt 6.11.2 runtime, including QtPdf | LGPL version 3, with component-specific notices | UI, image plugins and PDF preview |
 | PyQt6-sip 13.12.0 | BSD-2-Clause | Python binding runtime |
 | pypdf 6.10.0 | BSD-3-Clause | PDF import and export |
+| Pillow 12.3.0 | MIT-CMU, with bundled-library notices | Conservative PDF image recompression |
+| cryptography 50.0.1 | Apache-2.0 OR BSD-3-Clause, with bundled-library notices | AES-256 PDF encryption and decryption |
+| CFFI 2.1.1 and libffi | MIT-0 / original libffi MIT terms | Native cryptography binding runtime |
+| Rust libraries and OpenSSL embedded in cryptography | Original component licenses and exact SBOM/source records | Cryptography's native implementation |
 | Liberation Sans Regular 2.1.5 | SIL Open Font License 1.1 | Embedded font for editable text fields |
 | CPython | PSF license and its included third-party notices | Bundled Python interpreter and standard library |
 | PyInstaller 6.22.3 | GPL-2.0-or-later with its bootloader exception | Bundle bootloader and build tool |
 
-ReportLab and Pillow run source regression tests; the release builders remove
-them before collecting and freezing the runtime. Other installed build tools
+ReportLab runs source regression tests; the release builders remove
+it before collecting and freezing the runtime. Pillow and cryptography are
+runtime dependencies and their original distribution notices must be retained.
+Other installed build tools
 appear in the distribution manifest; an installed tool is not necessarily
 part of the shipped application.
 

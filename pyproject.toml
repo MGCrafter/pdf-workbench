@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-workbench"
-version = "0.5.3"
+version = "0.6.0"
 description = "Free, local PDF page organizer for Linux, Windows and macOS"
 authors = [{name = "xJessyX"}]
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE", "licenses/*"]
-dependencies = ["PyQt6>=6.8,<7", "pypdf>=6.10,<7"]
+dependencies = ["PyQt6>=6.8,<7", "pypdf>=6.10,<7", "Pillow>=11,<13", "cryptography>=46,<51"]
 
 [project.optional-dependencies]
 build = ["pyinstaller>=6,<7"]

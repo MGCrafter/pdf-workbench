@@ -13,6 +13,7 @@ from email.utils import parsedate_to_datetime
 import errno
 import http.client
 import hashlib
+import importlib.util
 from importlib import metadata
 import json
 from pathlib import Path, PurePosixPath
@@ -24,6 +25,7 @@ import ssl
 import subprocess
 import sys
 import sysconfig
+import tarfile
 import time
 import urllib.error
 import urllib.parse
@@ -32,6 +34,12 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 QT_VERSION = "6.11.2"
 LOCK = ROOT / "packaging/notices-lock.json"
+# This verbatim GNU original is small, immutable release input. Keep its
+# canonical provenance and digest in the same reviewed lock as the Qt notices,
+# so a flaky license-document host cannot interrupt an otherwise complete build.
+RUNTIME_LOCKED_NOTICES = {
+    "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt": "licenses/upstream/runtime/LGPL-2.1.txt",
+}
 # This release does not include WebEngine, Multimedia, Bluetooth or Qt3D.
 # New native Qt modules require an attribution/source audit before this list grows.
 COVERED_QT_MODULES = frozenset("Core Gui Widgets Network DBus Pdf PdfWidgets Svg SvgWidgets OpenGL OpenGLWidgets PrintSupport Sql Xml Concurrent Qml QmlMeta QmlModels QmlWorkerScript QmlBuiltins Quick QuickControls2 QuickTemplates2 QuickWidgets ShaderTools VirtualKeyboard WaylandClient WaylandCompositor WaylandEglClientHwIntegration WaylandEglCompositorHwIntegration InputSupport XcbQpa EglFSDeviceIntegration".split())
@@ -44,6 +52,34 @@ COVERED_QT_MODULES |= frozenset(("EglFsKmsGbmSupport", "EglFsKmsSupport", "WlShe
 
 class IncompleteNotices(RuntimeError):
     pass
+
+
+def runtime_wheels():
+    """Load the sibling audit module also when tests import this file by path."""
+    spec = importlib.util.spec_from_file_location("pdf_workbench_runtime_wheels", ROOT / "packaging/runtime_wheels.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def merge_runtime_sources(sources: list[dict], inventories: list[dict]) -> list[dict]:
+    module = runtime_wheels()
+    additions = []
+    for inventory in inventories:
+        if inventory.get("schema_version") != 1:
+            raise IncompleteNotices("Unsupported platform runtime inventory")
+        additions.extend(inventory.get("source_archives", []))
+    try:
+        additions = module.merge_source_records(additions)
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
+    by_name = {item["filename"]: item for item in sources}
+    for item in additions:
+        previous = by_name.get(item["filename"])
+        if previous and previous["sha256"] != item["sha256"]:
+            raise IncompleteNotices("Conflicting runtime-source filenames")
+        by_name[item["filename"]] = item
+    return [by_name[key] for key in sorted(by_name)]
 
 
 def sha256(path: Path) -> str:
@@ -102,9 +138,9 @@ def _retry_delay(error: Exception, attempt: int) -> float:
     return min(MAX_RETRY_DELAY,delay)
 
 
-def _network_retry(url: str, operation):
+def _network_retry(url: str, operation, attempts: int = NETWORK_ATTEMPTS):
     """Retry only transient transport failures; validation exceptions escape."""
-    for attempt in range(1,NETWORK_ATTEMPTS+1):
+    for attempt in range(1,attempts+1):
         try:
             return operation()
         except Exception as error:
@@ -116,9 +152,9 @@ def _network_retry(url: str, operation):
                 if isinstance(error,(urllib.error.URLError,ssl.SSLError,socket.gaierror,http.client.HTTPException)):
                     raise IncompleteNotices(f"Upstream request failed for {url}: {type(error).__name__}: {error}") from error
                 raise
-            if attempt == NETWORK_ATTEMPTS:
-                raise IncompleteNotices(f"Temporary upstream failure after {NETWORK_ATTEMPTS} attempts for {url}: {type(error).__name__}: {error}") from error
-            print(f"Temporary upstream failure ({type(error).__name__}: {error}); retry {attempt}/{NETWORK_ATTEMPTS-1} in {delay:g}s: {url}",file=sys.stderr,flush=True)
+            if attempt == attempts:
+                raise IncompleteNotices(f"Temporary upstream failure after {attempts} attempts for {url}: {type(error).__name__}: {error}") from error
+            print(f"Temporary upstream failure ({type(error).__name__}: {error}); retry {attempt}/{attempts-1} in {delay:g}s: {url}",file=sys.stderr,flush=True)
             time.sleep(delay)
 
 
@@ -132,13 +168,14 @@ def _response_length(response) -> int | None:
     return int(value)
 
 
-def fetch(url: str, limit: int = 16 * 1024 * 1024) -> bytes:
+def fetch(url: str, limit: int = 16 * 1024 * 1024, *, timeout: float = 90,
+          attempts: int = NETWORK_ATTEMPTS) -> bytes:
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme != "https":
         raise IncompleteNotices(f"Source URL must use HTTPS: {url}")
     def read_once():
         request = urllib.request.Request(url, headers={"User-Agent": "PDFWorkbench-release-notices/1"})
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             if urllib.parse.urlparse(response.url).scheme != "https":
                 raise IncompleteNotices("Refusing insecure upstream redirect")
             length = _response_length(response)
@@ -148,7 +185,7 @@ def fetch(url: str, limit: int = 16 * 1024 * 1024) -> bytes:
             if length is not None and len(data) < length:
                 raise http.client.IncompleteRead(data,length-len(data))
         return data
-    data = _network_retry(url,read_once)
+    data = _network_retry(url,read_once,attempts)
     if not data or len(data) > limit:
         raise IncompleteNotices(f"Missing or unexpectedly large notice/metadata: {url}")
     return data
@@ -178,6 +215,7 @@ def copy_locked_notices(output: Path) -> dict:
         "agg23/copying.txt", "bigint/LICENSE.txt", "lcms/LICENSE.txt",
         "libopenjpeg/LICENSE.txt", "libtiff/LICENSE.md.txt",
         "dragonbox/LICENSE-Apache2-LLVM.txt", "dragonbox/LICENSE-Boost.txt")}
+    critical |= set(RUNTIME_LOCKED_NOTICES.values())
     if not critical <= paths:
         raise IncompleteNotices(f"Critical Qt/PDFium notices missing from lock: {sorted(critical-paths)}")
     for item in lock["files"]:
@@ -190,6 +228,21 @@ def copy_locked_notices(output: Path) -> dict:
         raise IncompleteNotices("Missing PDFium/Foxit font copyright")
     put(output, "upstream-lock.json", LOCK.read_bytes())
     return lock
+
+
+def fetch_runtime_notice(url: str, output: Path, lock: dict) -> bytes:
+    """Serve only explicitly locked originals locally; preserve all other fetch gates."""
+    relative = RUNTIME_LOCKED_NOTICES.get(url)
+    if relative is None:
+        return fetch(url)
+    entries = [item for item in lock.get("files", []) if item.get("path") == relative]
+    if len(entries) != 1 or entries[0].get("source_url") != url:
+        raise IncompleteNotices("Locked runtime notice has missing or ambiguous canonical provenance")
+    path = output / safe_relative(relative.removeprefix("licenses/"))
+    if (path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(output.resolve())
+            or sha256(path) != entries[0].get("sha256")):
+        raise IncompleteNotices("Missing/modified locked runtime notice")
+    return path.read_bytes()
 
 
 def normalized_name(value: str) -> str:
@@ -207,7 +260,7 @@ def release_pins() -> dict[str, str]:
 
 def collect_distributions(output: Path) -> tuple[dict, list]:
     pins = release_pins()
-    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib"}
+    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib", "pillow", "cryptography", "cffi", "pycparser"}
     versions, inventory = {}, []
     for dist in sorted(metadata.distributions(), key=lambda d: normalized_name(d.metadata.get("Name", ""))):
         name = dist.metadata.get("Name")
@@ -236,7 +289,7 @@ def collect_distributions(output: Path) -> tuple[dict, list]:
     if not required <= found:
         raise IncompleteNotices(f"Missing release distributions: {sorted(required-found)}")
     # Record predictable keys regardless of wheel metadata capitalization.
-    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib")}
+    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser")}
     from PyQt6.QtCore import qVersion, PYQT_VERSION_STR
     versions.update({"Qt": qVersion(), "Python": platform.python_version()})
     if versions["Qt"] != QT_VERSION or PYQT_VERSION_STR != versions["PyQt6"]:
@@ -315,7 +368,7 @@ def collect_system_notices(output: Path) -> None:
 
 def source_archives(versions: dict, lock: dict) -> list[dict]:
     result = [dict(lock["qt_source_archive"])]
-    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib"):
+    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser"):
         version = versions[package]
         data = json.loads(fetch(f"https://pypi.org/pypi/{package}/{version}/json"))
         sdists = [item for item in data["urls"] if item["packagetype"] == "sdist"]
@@ -336,7 +389,7 @@ def source_archives(versions: dict, lock: dict) -> list[dict]:
     return result
 
 
-def native_source_inventory(toc: Path) -> dict:
+def native_source_inventory(toc: Path, runtime_inventory: dict | None = None) -> dict:
     """Map actually collected ELF files to exact Ubuntu source packages."""
     if sys.platform != "linux" or not shutil.which("dpkg-query"):
         raise IncompleteNotices("Native source inventory requires the Ubuntu release builder")
@@ -360,6 +413,15 @@ def native_source_inventory(toc: Path) -> dict:
     for source in sorted(sources):
         path = source.resolve()
         parts = path.parts
+        if runtime_inventory is not None:
+            module = runtime_wheels()
+            try:
+                provider = module.native_provider(source, runtime_inventory)
+            except module.RuntimeAuditError as error:
+                raise IncompleteNotices(str(error)) from error
+            if provider is not None:
+                exclusions.append(provider)
+                continue
         if "PyQt6" in parts or "PyInstaller" in parts:
             exclusions.append({"path": str(source), "reason": "Matching Qt/PyQt/PyInstaller source archives"})
             continue
@@ -390,42 +452,124 @@ def native_source_inventory(toc: Path) -> dict:
             "packages": [packages[key] for key in sorted(packages)], "exclusions": exclusions}
 
 
-def _ubuntu_package_sources(package: dict) -> list[dict]:
+def _ubuntu_identity(package: dict) -> tuple[str, str]:
     name, version = package["source_package"], package["source_version"]
+    if (not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name)
+            or not re.fullmatch(r"[A-Za-z0-9.+:~_-]+", version)):
+        raise IncompleteNotices("Invalid Ubuntu source package identity")
+    return name, version
+
+
+def _ubuntu_descriptor(package: dict, dsc_name: str, data: bytes,
+                       dsc_url: str, source_urls: dict[str, str] | None = None) -> list[dict]:
+    """Require the exact installed source identity and every original SHA-256."""
+    name, version = _ubuntu_identity(package)
+    if safe_relative(dsc_name).name != dsc_name or not dsc_name.endswith(".dsc"):
+        raise IncompleteNotices("Unsafe Ubuntu source descriptor filename")
+    if urllib.parse.urlparse(dsc_url).scheme != "https":
+        raise IncompleteNotices("Ubuntu descriptor URL must use HTTPS")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeError as error:
+        raise IncompleteNotices("Ubuntu descriptor is not readable UTF-8") from error
+    if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
+        text = text.replace("\r\n", "\n")
+        if "\n\n" not in text or "-----BEGIN PGP SIGNATURE-----" not in text:
+            raise IncompleteNotices("Ubuntu descriptor has an incomplete signed envelope")
+        text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
+    control = Parser().parsestr(text)
+    if (len(control.get_all("Source", [])) != 1 or len(control.get_all("Version", [])) != 1
+            or control.get("Source") != name or control.get("Version") != version):
+        raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
+    records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
+                "url": dsc_url, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
+                "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
+    checksums = control.get("Checksums-Sha256", "").strip().splitlines()
+    if not checksums or len(control.get_all("Checksums-Sha256", [])) != 1:
+        raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
+    seen = {dsc_name}
+    for line in checksums:
+        fields = line.split()
+        if len(fields) != 3:
+            raise IncompleteNotices("Ubuntu descriptor contains an invalid SHA-256 source record")
+        digest, size, filename = fields
+        if (not re.fullmatch(r"[0-9a-f]{64}", digest) or not re.fullmatch(r"[1-9][0-9]{0,9}", size)
+                or int(size) > 2 * 1024 * 1024 * 1024 or safe_relative(filename).name != filename
+                or filename in seen or (source_urls is not None and filename not in source_urls)):
+            raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
+        seen.add(filename)
+        url = (source_urls[filename] if source_urls is not None
+               else urllib.parse.urljoin(dsc_url, urllib.parse.quote(filename, safe="")))
+        if urllib.parse.urlparse(url).scheme != "https":
+            raise IncompleteNotices("Ubuntu source archive URL must use HTTPS")
+        records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
+                        "url": url, "sha256": digest, "size": int(size), "digest_source": dsc_url})
+    return records
+
+
+def _pool_availability_failure(error: Exception) -> str | None:
+    """Only missing files or transport failures permit switching source providers."""
+    current, seen = error, set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, urllib.error.HTTPError) and current.code in (404, 410):
+            return "missing"
+        if _temporary_network_error(current):
+            return "host-unavailable"
+        current = current.__cause__
+    return None
+
+
+def _ubuntu_pool_sources(package: dict) -> list[dict] | None:
+    name, version = _ubuntu_identity(package)
+    # Epochs belong to the descriptor's Version field, never its filename.
+    filename = f"{name}_{version.split(':', 1)[-1]}.dsc"
+    prefix = name[:4] if name.startswith("lib") else name[0]
+    unavailable = set()
+    for component in ("main", "universe", "restricted", "multiverse"):
+        for host in ("archive.ubuntu.com", "security.ubuntu.com"):
+            if host in unavailable:
+                continue
+            url = (f"https://{host}/ubuntu/pool/{component}/{prefix}/{name}/"
+                   + urllib.parse.quote(filename, safe=""))
+            try:
+                # One bounded probe; a transient host outage goes to the other
+                # canonical host, not five 90-second attempts per component.
+                data = fetch(url, limit=512 * 1024, timeout=12, attempts=1)
+            except Exception as error:
+                availability = _pool_availability_failure(error)
+                if availability is None:
+                    raise
+                if availability == "host-unavailable":
+                    unavailable.add(host)
+                continue
+            return _ubuntu_descriptor(package, filename, data, url)
+    return None
+
+
+def _launchpad_package_sources(package: dict) -> list[dict]:
+    """Historical versions removed from the current archive can remain in Launchpad."""
+    name, version = _ubuntu_identity(package)
     query = urllib.parse.urlencode({"ws.op": "getPublishedSources", "source_name": name,
                                     "version": version, "exact_match": "true"})
-    publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query))
+    publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query,
+                                   timeout=15, attempts=2))
     publication = next((item for item in publications.get("entries", []) if
                         item["source_package_name"] == name and item["source_package_version"] == version), None)
     if not publication:
         raise IncompleteNotices(f"Exact Ubuntu source publication unavailable: {name} {version}")
-    urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls"))
+    urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls", timeout=15, attempts=2))
     by_name = {urllib.parse.unquote(urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]): url for url in urls}
     dsc_names = [filename for filename in by_name if filename.endswith(".dsc")]
     if len(dsc_names) != 1:
         raise IncompleteNotices(f"No unique Ubuntu source descriptor for {name} {version}")
     dsc_name = dsc_names[0]
-    data = fetch(by_name[dsc_name])
-    text = data.decode("utf-8")
-    if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
-        text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
-    control = Parser().parsestr(text)
-    if control.get("Source") != name or control.get("Version") != version:
-        raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
-    records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
-                "url": by_name[dsc_name], "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
-                "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
-    checksums = control.get("Checksums-Sha256", "").strip().splitlines()
-    if not checksums:
-        raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
-    for line in checksums:
-        digest, size, filename = line.split()
-        if not re.fullmatch(r"[0-9a-f]{64}", digest) or filename not in by_name:
-            raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
-        records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
-                        "url": by_name[filename], "sha256": digest, "size": int(size),
-                        "digest_source": by_name[dsc_name]})
-    return records
+    data = fetch(by_name[dsc_name], limit=512 * 1024, timeout=15, attempts=2)
+    return _ubuntu_descriptor(package, dsc_name, data, by_name[dsc_name], by_name)
+
+
+def _ubuntu_package_sources(package: dict) -> list[dict]:
+    return _ubuntu_pool_sources(package) or _launchpad_package_sources(package)
 
 
 def ubuntu_source_archives(inventory: dict) -> list[dict]:
@@ -496,6 +640,16 @@ def download_sources(items: list[dict], destination: Path) -> None:
                 raise IncompleteNotices(f"Source digest mismatch: {filename}")
             if item.get("size") and size != item["size"]:
                 raise IncompleteNotices(f"Source size mismatch: {filename}")
+            if expected is None and item.get("digest_source") == runtime_wheels().CALCULATED_DIGEST:
+                # Pinning a release-tag URL is not a digest. Before recording
+                # its cloud-calculated hash, ensure a mirror did not return a
+                # successful HTML error/login page instead of the source tar.
+                try:
+                    with tarfile.open(temporary, "r:*") as archive:
+                        if archive.next() is None:
+                            raise IncompleteNotices(f"Empty calculated source archive: {filename}")
+                except tarfile.TarError as error:
+                    raise IncompleteNotices(f"Calculated source is not a readable archive: {filename}") from error
             temporary.replace(path)
             item.update(sha256=actual, size=size)
         finally:
@@ -514,6 +668,15 @@ def verify_bundle(bundle: Path, notices: Path) -> dict:
         path = notices / safe_relative(relative)
         if not path.resolve().is_relative_to(notices.resolve()) or path.is_symlink() or not path.is_file() or sha256(path) != expected:
             raise IncompleteNotices(f"Notice manifest mismatch: {relative}")
+    runtime_path = notices / "runtime-wheels.json"
+    inventory = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else None
+    if inventory is not None and "runtime-wheels.json" not in manifest["files"]:
+        raise IncompleteNotices("Runtime-wheel inventory is not bound to the notice manifest")
+    module = runtime_wheels()
+    try:
+        runtime = module.verify_frozen_runtime(bundle, inventory)
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
     modules = set()
     for path in bundle.rglob("*"):
         match = re.match(r"(?:lib)?Qt6([A-Za-z0-9]+)(?:\.so(?:\..*)?|\.dll)$", path.name)
@@ -524,7 +687,7 @@ def verify_bundle(bundle: Path, notices: Path) -> dict:
     unknown = modules - COVERED_QT_MODULES
     if unknown:
         raise IncompleteNotices(f"Native Qt modules need a new attribution/source audit: {sorted(unknown)}")
-    return {"verified": True, "qt_modules": sorted(modules)}
+    return {"verified": True, "qt_modules": sorted(modules), "runtime_extensions": runtime}
 
 
 def main() -> int:
@@ -534,6 +697,8 @@ def main() -> int:
     parser.add_argument("--verify-bundle", type=Path)
     parser.add_argument("--native-toc", type=Path, help="Emit native-sources.json from a completed Ubuntu Analysis-00.toc")
     parser.add_argument("--native-sources", type=Path, help="Include the Ubuntu build's native-sources.json in source acquisition")
+    parser.add_argument("--runtime-sources", type=Path, action="append", default=[],
+                        help="Merge a native builder's runtime-wheels.json source records (repeat for Windows/Linux)")
     args = parser.parse_args()
     output = args.output.resolve()
     if args.native_toc:
@@ -542,7 +707,11 @@ def main() -> int:
         if manifest.get("schema_version") != 1 or manifest.get("complete") is not True:
             raise IncompleteNotices("Native source audit requires complete existing notices")
         manifest_path.unlink()
-        inventory = native_source_inventory(args.native_toc.resolve())
+        runtime_path = output / "runtime-wheels.json"
+        if not runtime_path.is_file() or manifest.get("files", {}).get("runtime-wheels.json") != sha256(runtime_path):
+            raise IncompleteNotices("Native source audit requires its matching runtime-wheel inventory")
+        runtime_inventory = json.loads(runtime_path.read_text(encoding="utf-8"))
+        inventory = native_source_inventory(args.native_toc.resolve(), runtime_inventory)
         archives = ubuntu_source_archives(inventory)
         put(output, "native-sources.json", (json.dumps(inventory, indent=2) + "\n").encode())
         manifest["files"]["native-sources.json"] = sha256(output / "native-sources.json")
@@ -568,6 +737,15 @@ def main() -> int:
     collect_python(output, versions["Python"])
     collect_system_notices(output)
     sources = source_archives(versions, lock)
+    module = runtime_wheels()
+    try:
+        runtime_inventory = module.collect_runtime_notices(output, lambda url: fetch_runtime_notice(url, output, lock))
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
+    platform_inventories = [runtime_inventory]
+    for path in args.runtime_sources:
+        platform_inventories.append(json.loads(path.read_text(encoding="utf-8")))
+    sources = merge_runtime_sources(sources, platform_inventories)
     if args.native_sources:
         inventory = json.loads(args.native_sources.read_text(encoding="utf-8"))
         sources.extend(ubuntu_source_archives(inventory))

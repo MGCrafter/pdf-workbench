@@ -4,14 +4,15 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-![PDF Workbench im Dark Mode mit Textfeldern, einem Bild, einem Stempel und Symbolen](docs/assets/screenshot.png)
+**Version 0.6.0** ergänzt eine neue Oberfläche, Komprimierung, Passwortschutz
+und das Ausfüllen vorhandener PDF-Formulare.
 
 ## Download
 
-| System | Download für v0.5.3 |
+| System | Download für v0.6.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.3/PDFWorkbench-v0.5.3-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.3/PDFWorkbench-v0.5.3-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.6.0/PDFWorkbench-v0.6.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.6.0/PDFWorkbench-v0.6.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -26,7 +27,7 @@ bleiben.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.5.3-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.6.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
@@ -48,6 +49,8 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Scans mit optionalem Tesseract lokal durchsuchbar machen.
 - Seiten als Miniaturen ansehen und in der Vorschau zoomen und verschieben.
 - Helle oder dunkle Oberfläche; auf Wunsch passend zur Systemeinstellung.
+- Ab 0.6: Komprimieren mit Größenvergleich, geschützte PDFs öffnen und mit
+  AES-256 speichern, normale AcroForms ausfüllen.
 
 ## Loslegen
 
@@ -74,7 +77,7 @@ die Eckpunkte ändern ihre Größe. Ein Doppelklick öffnet die Eigenschaften.
 als neue Seiten; **Datei → Durchsuchbare PDF erstellen (OCR) …** startet die
 optionale Texterkennung. Die [OCR-Anleitung](docs/ocr.md) erklärt die Einrichtung.
 
-Der blaue Rahmen zeigt die Seite in der Vorschau, die Häkchen zeigen die
+Der hervorgehobene Rahmen zeigt die Seite in der Vorschau, die Häkchen zeigen die
 Auswahl für die Werkzeuge. Mehr zur Bedienung steht in der
 [kurzen Anleitung](docs/usage.md).
 
@@ -103,8 +106,15 @@ Originalfarben.
 Die App richtet sich an normale Dokumentseiten. Gezeichnete Unterschriften
 sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 
-- Verschlüsselte PDFs, interaktive Formulare und mit Zertifikaten signierte
-  Dateien werden derzeit abgewiesen.
+- PDFs mit Öffnungspasswort lassen sich entsperren und als neue Datei mit
+  AES-256 schützen. Normale Exporte, Einzelseiten und OCR bleiben unverschlüsselt.
+  Passwörter werden nicht in Einstellungen oder Dokument-Snapshots gespeichert.
+- Normale AcroForms mit Textfeldern, Kontrollkästchen und Einfachauswahl werden
+  unterstützt. XFA, Zertifikatssignaturen, Optionsschalter, Aktionsschaltflächen,
+  Skripte, Berechnungen und mehrdeutige oder nicht seitengebundene Felder werden
+  abgewiesen. Neue interaktive Formularfelder können noch nicht erstellt werden.
+- Bildkomprimierung kann Details verlieren; spezielle Bildformate und Masken
+  bleiben unverändert. Es gibt keine garantierte Größenersparnis.
 - Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
   sie für Scans ergänzen. Bestehender PDF-Text lässt sich nicht direkt ändern;
   neue Textfelder sind eigene Objekte.
@@ -118,7 +128,8 @@ getestet werden, steht unter [Tests](docs/testing.md).
 
 ## Aus dem Quellcode starten
 
-Benötigt werden Python 3.11 oder neuer, PyQt6 und pypdf. Im Projektordner:
+Benötigt wird Python 3.11 oder neuer. Die Installation übernimmt PyQt6, pypdf,
+Pillow und cryptography. Im Projektordner:
 
 **Linux:**
 
