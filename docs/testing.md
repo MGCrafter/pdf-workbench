@@ -8,7 +8,17 @@ nicht exportierter Formularseiten und ihrer Daten. Poppler und Qt vergleichen
 die Darstellung unabhängig von pypdf. Die neue GUI-Abnahme prüft die Dialoge,
 800×560-Pixel-Fenster in beiden Themes und abschaltbare Animationen.
 
-Die konkreten lokalen Ergebnisse stehen im [Windows-Testbericht](windows-v06-testing.md).
+Der lokale Schlussstand 0.7 (`be75a71`, 21.10.2026) besteht auf Linux
+373 Tests ohne Fehler oder Skips. Die gebaute App besteht zusätzlich 18
+PDF-Kerntests und die native Wayland-GUI-Abnahme. Das ist ein lokaler
+Entwicklungsbuild auf glibc 2.44; die veröffentlichten Linux-Pakete werden
+separat auf Ubuntu 22.04 gebaut und getestet.
+
+Unter Windows 11 bestehen 367 gemeldete Tests mit 14 ausdrücklich ausgewiesenen
+Skips sowie der Quell- und EXE-Selbsttest mit je 18 PDF-Prüfungen und nativer
+GUI-Abnahme. Details und Prüfgrenzen stehen im
+[Windows-Testbericht für 0.7](windows-v07-testing.md). Der historische
+[Bericht für 0.6](windows-v06-testing.md) bleibt erhalten.
 Die vollständige lokale Reviewchronik wird in `docs/review.md` geführt und nicht
 veröffentlicht. Die lokalen Nachweise beschreiben Entwicklungsbuilds. Für die
 veröffentlichten Pakete prüft der jeweilige Release-Lauf zusätzlich die fertig
