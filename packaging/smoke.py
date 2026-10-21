@@ -658,6 +658,8 @@ def gui_acceptance(directory: Path):
         feature_checks += upgrade_acceptance(window, directory, app, wait_for, fixture)
         from v07_smoke import v07_acceptance
         feature_checks += v07_acceptance(window, directory, app, wait_for, fixture)
+        from v08_smoke import v08_acceptance
+        feature_checks += v08_acceptance(window, directory, app, wait_for, fixture)
         preview.fit_page(); app.processEvents()
         wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
@@ -693,8 +695,9 @@ def main():
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     with (run / "test.log").open("w", encoding="utf-8") as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
         try:
-            from v07_smoke import acceptance_class
-            acceptance = acceptance_class(PdfAcceptance, fixture)
+            from v07_smoke import acceptance_class as v07_class
+            from v08_smoke import acceptance_class as v08_class
+            acceptance = v08_class(v07_class(PdfAcceptance, fixture), fixture)
             acceptance.base = run
             result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(acceptance))
             report["core"] = {"tests": result.testsRun, "failures": len(result.failures), "errors": len(result.errors), "skipped": [(str(test), reason) for test, reason in result.skipped],

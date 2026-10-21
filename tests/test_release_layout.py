@@ -95,6 +95,54 @@ class ReleaseLayoutTests(unittest.TestCase):
         self.assertEqual(manifest["native_assets"], [self.record(name, self.files[name]) for name in (self.windows, self.linux)])
         self.assertEqual(original, {path.name: path.read_bytes() for path in self.input.iterdir()})
 
+    def test_v08_publication_requires_complete_linked_native_feature_reports(self):
+        import copy
+        import sys
+        checks_spec = importlib.util.spec_from_file_location('release_checks', PROJECT / 'packaging/release_checks.py')
+        checks = importlib.util.module_from_spec(checks_spec); checks_spec.loader.exec_module(checks)
+        self.tag = 'v0.8.0'
+        old_files = self.files
+        self.files = {name.replace('v0.5.3', self.tag): data for name, data in old_files.items()}
+        self.windows = f'PDFWorkbench-{self.tag}-windows-x86_64.zip'
+        self.linux = f'PDFWorkbench-{self.tag}-linux-x86_64.tar.gz'
+        self.source = f'PDFWorkbench-{self.tag}-source.tar.gz'
+        for path in self.input.iterdir(): path.unlink()
+        core = {'tests': 23, 'failures': 0, 'errors': 0, 'skipped': [],
+                'checks': sorted(checks.V06_CORE_CHECKS | checks.V07_CORE_CHECKS | checks.V08_CORE_CHECKS)}
+        gui_checks = sorted(checks.V06_GUI_CHECKS | checks.V07_GUI_CHECKS | checks.V08_GUI_CHECKS)
+        executable_sha = 'b' * 64; source_hashes = {'src/app.py': 'c' * 64}
+        for target, platform_name in (('linux', 'xcb'), ('windows', 'windows')):
+            provenance = {'app_version': '0.8.0', 'source_commit': self.commit, 'source_sha256': source_hashes}
+            info = dict(provenance, executable_sha256=executable_sha,
+                        acceptance={'core': core, 'gui_checks': gui_checks, 'qt_platform': platform_name})
+            report = {'result': 'PASS', 'frozen': True, 'app_version': '0.8.0', 'provenance': provenance,
+                      'executable_sha256': executable_sha, 'core': core,
+                      'gui': {'result': 'PASS', 'app_version': '0.8.0', 'qt_platform': platform_name, 'checks': gui_checks}}
+            self.files[f'PDFWorkbench-{self.tag}-{target}-BUILD-INFO.json'] = json.dumps(info).encode()
+            self.files[f'PDFWorkbench-{self.tag}-{target}-acceptance.json'] = json.dumps(report).encode()
+        for name, data in self.files.items(): (self.input / name).write_bytes(data)
+        self.write_checksums()
+        with patch.dict(sys.modules, {'release_checks': checks}):
+            self.assertEqual(len(self.prepare()['app_assets']), 3)
+            for target in ('linux', 'windows'):
+                name = f'PDFWorkbench-{self.tag}-{target}-acceptance.json'
+                original = self.files[name]
+                cases = []
+                for section, required in (('core', checks.V08_CORE_CHECKS), ('gui', checks.V08_GUI_CHECKS)):
+                    for missing in required:
+                        broken = json.loads(original); broken[section]['checks'].remove(missing); cases.append(broken)
+                broken = json.loads(original); broken['core']['tests'] = 22; cases.append(broken)
+                broken = json.loads(original); broken['executable_sha256'] = 'd' * 64; cases.append(broken)
+                broken = json.loads(original); broken['provenance']['source_commit'] = 'd' * 40; cases.append(broken)
+                broken = json.loads(original); broken['gui']['qt_platform'] = 'offscreen'; cases.append(broken)
+                broken = json.loads(original); broken['core']['skipped'] = ['not installed']; cases.append(broken)
+                for index, case in enumerate(cases):
+                    self.files[name] = json.dumps(case).encode(); (self.input / name).write_bytes(self.files[name]); self.write_checksums()
+                    with self.subTest(target=target, case=index), self.assertRaises(ValueError):
+                        self.output = self.root / f'invalid-{target}-{index}'
+                        self.prepare()
+                self.files[name] = original; (self.input / name).write_bytes(original); self.write_checksums()
+
     def test_archive_and_manifest_are_deterministic_despite_mtime_and_permission_changes(self):
         first = self.prepare()
         archive_bytes = first["materials_archive"].read_bytes()

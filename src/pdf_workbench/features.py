@@ -63,6 +63,7 @@ def export_pages_separately(
     destination_directory: str | Path,
     cancel: CancelCheck | None = None,
     progress: Progress | None = None,
+    *, bookmarks=None,
 ) -> Path:
     """Create an exclusively new folder containing one PDF for each page.
 
@@ -117,7 +118,7 @@ def export_pages_separately(
                 if progress:
                     progress(min(99, int((index * 100 + value) / len(pages))), f"Arbeitsseite {index + 1} von {len(pages)}: {message}")
 
-            export_pdf(sources, [page], current, cancel=cancel, progress=page_progress)
+            export_pdf(sources, [page], current, cancel=cancel, progress=page_progress, bookmarks=bookmarks)
             if cancel and cancel():
                 raise OperationCancelled("Einzelexport abgebrochen.")
         if progress:

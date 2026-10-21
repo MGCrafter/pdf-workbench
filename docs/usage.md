@@ -1,5 +1,88 @@
 # Bedienung
 
+## Projekte und automatische Sicherung
+
+**Datei → Projekt speichern** oder **Strg+S** sichert den ganzen Arbeitsbereich
+als `.pdfwb`: eingebettete PDFs, eigene Objekte, Lesezeichen, Auswahl, Zoom und
+Undo-/Redo-Historie. Die ursprünglichen PDFs müssen später nicht mehr am selben
+Ort liegen. **Projekt öffnen** hat die Tastenkombination **Strg+Alt+O**.
+PDF-Exporte bleiben eigenständige neue Dateien; ein geöffnetes Projekt darf
+aktualisiert werden, solange es außerhalb dieses Fensters nicht verändert wurde.
+
+**Projekt mit Passwort speichern …** schützt das gesamte Projekt mit AES-GCM
+und einem aus dem Passwort abgeleiteten Schlüssel. Das Passwort wird nicht
+gespeichert und kann nicht zurückgesetzt werden. Enthält die Sitzung zuvor
+entsperrte PDFs, auch in der Undo-Historie, ist dieser Schutz erforderlich.
+Passwörter bleiben bis zum Schließen des Projekts nur im Arbeitsspeicher.
+
+Die automatische Sicherung ist unter **Datei** abschaltbar. Nach einer kurzen
+Bearbeitungspause legt sie lokal zwei Generationen ab. Nach einem Absturz bietet
+der nächste Start die Wiederherstellung an; laufende andere Fenster werden
+dabei ausgeschlossen. Wiederhergestellte Sitzungen werden unter einem neuen
+Projektnamen gespeichert. Der Wiederherstellungsdialog kann auch später über
+**Datei → Automatische Sicherung wiederherstellen …** geöffnet werden.
+Normales bestätigtes Schließen verwirft nur die eigene automatische Sicherung.
+Bei entsperrten PDFs pausiert Autosave, bis ein geschütztes Projekt gespeichert
+wurde; anschließend sind auch dessen automatische Sicherungen verschlüsselt.
+Sicherungen sind keine externe Datensicherung. Projekte dürfen bis zu 1 GiB groß sein.
+
+## Programm aktualisieren
+
+**Hilfe → Programm aktualisieren …** prüft das offizielle stabile GitHub-Release.
+Standardmäßig läuft höchstens einmal täglich eine kleine Versionsabfrage; im
+Dialog lässt sich das abschalten. Dokumente werden dabei nicht übertragen.
+Ohne Verbindung kann die App normal weiterarbeiten.
+
+Download und **Neustarten und installieren …** erfordern jeweils einen Klick.
+Vorher lassen sich offene Arbeiten als Projekt speichern und danach wieder
+öffnen. Geschützte Projekte fragen beim Neustart ihr Passwort erneut ab.
+Das Paket wird anhand von Größe, GitHub-SHA-256 und veröffentlichten Prüfsummen
+geprüft. Ein Dateinachweis kontrolliert das neue portable Programm; fremde Dateien
+im alten Programmordner werden erhalten oder bei Namenskollisionen ausdrücklich
+abgewiesen. Ein Helfer wartet auf das Ende der App, tauscht die Ordner und behält
+die vorige Version als Sicherung. Scheitert der neue Programmstart, nimmt er den
+Austausch zurück. Zum Aufräumen der alten Sicherung zuerst den erfolgreichen
+Start und die eigenen Dateien prüfen.
+
+Unterstützt werden portable x86_64-Pakete für Windows und Linux in einem
+beschreibbaren eigenen Ordner. Es gibt keine Administratorinstallation oder
+automatische Änderung eines Quellcode-Checkouts. Links im Programmordner werden
+abgewiesen. Die Pakete sind derzeit nicht mit einem Herausgeberzertifikat signiert;
+die Prüfung vertraut dem offiziellen GitHub-Release über HTTPS. Version 0.8 muss
+einmal manuell entpackt werden; deren Updater installiert anschließend künftige Versionen.
+
+## Lesezeichen
+
+**Werkzeuge → Lesezeichen bearbeiten …** (**Strg+Alt+B**) verwaltet Kapitel und
+Unterkapitel mit Seitenauswahl. Umbenennen, Löschen, Einrücken und Verschieben
+funktionieren mit den sichtbaren Schaltflächen und per Tastatur. Die Ziele sind
+an Arbeitsseiten gebunden und folgen ihrer neuen Reihenfolge. Entfernte Ziele
+werden beim Export ausgelassen; Kapitel mit gültigen Unterkapiteln können als
+Ordner erhalten bleiben. Bei automatisch importierten Zielen wird die erste
+enthaltene Kopie verwendet, neu zugewiesene Ziele können eine bestimmte Kopie wählen.
+Die Ansicht verwendet ganze Seiten; ursprüngliche Detail-Zoompositionen und
+externe Aktionen, Skripte oder Programme werden nicht übernommen.
+
+## Zuschneiden und Seitenformat
+
+**Werkzeuge → Seiten zuschneiden …** bietet einen ziehbaren Rahmen, vier Ränder
+in Millimetern und Pfeiltasten für genaue Änderungen. **Ergebnis anzeigen**
+wechselt von der Originalseite zur echten Ergebnisvorschau. Als Ziel stehen alle
+Arbeitsseiten, die Auswahl oder ein Bereich bereit. Zuschneiden blendet den
+Rand nur aus: versteckte Texte und Bilder bleiben vorhanden und sind weiterhin
+auslesbar. Es ist **keine Schwärzung**.
+
+**Seitenformat ändern …** passt Inhalte proportional in A4, Letter oder eigene
+Abmessungen ein. Rand und neun Positionen bestimmen die Platzierung; Vergrößern
+ist abschaltbar. Drehen und vorhandene PDF-Maßeinheiten werden berücksichtigt.
+Eine Änderung ist ein gemeinsamer Undo-Schritt; andere Kopien und Originaldateien
+bleiben geschützt. Eigene Objekte bleiben bearbeitbar, solange sie vollständig
+im Ausschnitt liegen. Angeschnittene eigene Objekte werden als normale sichtbare
+PDF-Anmerkungen erhalten. Native Anmerkungen oder Formularfelder, die bereits
+über den alten sichtbaren Seitenrand hinausragen, verhindern eine Formatänderung,
+damit verdeckte Ansichten nicht wieder erscheinen. Extreme Skalierungen mit
+eigenen Textgrößen außerhalb 4–288 Punkt werden vor der Übernahme abgewiesen.
+
 ## Dateien und Seiten
 
 **PDFs hinzufügen …** öffnet eine oder mehrere Dateien. Du kannst PDFs auch

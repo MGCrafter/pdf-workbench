@@ -502,7 +502,11 @@ def copy_page_fields(writer, added, reader, source_page, namespace):
                     new_name = NameObject(f"/WB_{namespace}_{str(font_name)[1:]}")
                     destination_fonts[new_name] = font.clone(writer)
                     font_names[str(font_name)] = str(new_name)
-            da = _inherited(chain, "/DA", source_form.get("/DA"))
+            # A widget may override its field's font size (for example after
+            # resizing only one copy). Keep that override on the widget; using
+            # it as the shared parent's default would change its other copies.
+            field_chain = chain[1:] if len(chain) > 1 and "/T" not in source_widget else chain
+            da = _inherited(field_chain, "/DA", source_form.get("/DA"))
             if da is not None:
                 parent[NameObject("/DA")] = TextStringObject(re.sub(r"/[^\s]+", lambda match: font_names.get(match[0], match[0]), str(da)))
             parent_ref = writer._add_object(parent)
@@ -520,6 +524,10 @@ def copy_page_fields(writer, added, reader, source_page, namespace):
         widget = DictionaryObject({key: value for key, value in source_widget.items() if key not in excluded}).clone(writer, force_duplicate=True)
         widget[NameObject("/Parent")] = parent_ref
         widget[NameObject("/P")] = added.indirect_reference
+        if "/DA" in source_widget:
+            source_fonts=_object(_object(reader.trailer["/Root"]["/AcroForm"].get("/DR",{})).get("/Font",{}))
+            widget[NameObject("/DA")]=TextStringObject(re.sub(r"/[^\s]+",lambda match:
+                f"/WB_{namespace}_{match[0][1:]}" if match[0] in source_fonts else match[0],str(source_widget["/DA"])))
         if is_radio and "/TU" in source_widget:
             widget[NameObject("/TU")] = source_widget["/TU"].clone(writer)
         widget_ref = writer._add_object(widget)

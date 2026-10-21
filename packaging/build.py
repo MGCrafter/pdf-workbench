@@ -94,6 +94,8 @@ def main():
         '--add-data', f'{ROOT / "src/pdf_workbench/fonts"}:pdf_workbench/fonts',
         *notice_data, str(ROOT / 'packaging/entry.py'),
     ], cwd=ROOT, check=True)
+    from pdf_workbench.update_installer import write_bundle_manifest
+    write_bundle_manifest(distpath / 'PDFWorkbench')
     print(f'Build: {distpath / "PDFWorkbench"}')
 
 

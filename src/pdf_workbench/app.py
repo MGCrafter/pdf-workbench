@@ -41,6 +41,7 @@ from .ui.motion import MotionController
 from .ui.welcome import WelcomeWorkspace
 from .ui.pdf_dialogs import CompressionDialog, FormDialog, PasswordDialog, size_text
 from .ui.theme import file_dialog_options, semantic_label, stylesheet, theme_controller
+from .ui.workspace_session import WorkspaceSession
 
 
 class Job(QThread):
@@ -65,7 +66,7 @@ class Job(QThread):
             self.task = None
 
 
-class MainWindow(QMainWindow):
+class MainWindow(WorkspaceSession, QMainWindow):
     def __init__(self):
         super().__init__()
         self.theme = theme_controller()
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
         self._pending_locked_files = []
         self._after_job_callback = None
         self._closing_requested = False
+        self._init_session()
         self.render_broker = RenderBroker(self)
         self.render_broker.closed.connect(self._rendering_closed)
         self.setWindowTitle("PDF Workbench")
@@ -311,6 +313,15 @@ class MainWindow(QMainWindow):
         self.images_action = self._action(file_menu, "Bilder zu PDF-Seiten …", None, self.import_images, "document")
         self.new_action = self._action(file_menu, "Neuer Arbeitsbereich", QKeySequence.StandardKey.New, self.new_workspace, "new")
         file_menu.addSeparator()
+        self.open_project_action = self._action(file_menu, "Projekt öffnen …", "Ctrl+Alt+O", self.open_project, "document")
+        self.save_project_action = self._action(file_menu, "Projekt speichern", QKeySequence.StandardKey.Save, self.save_project, "document")
+        self.save_project_as_action = self._action(file_menu, "Projekt unter neuem Namen …", None, lambda: self.save_project(save_as=True))
+        self.protect_project_action = self._action(file_menu, "Projekt mit Passwort speichern …", None, lambda: self.save_project(save_as=True, protect=True), "lock")
+        self.recovery_action = self._action(file_menu, "Automatische Sicherung wiederherstellen …", None, self.recover_project)
+        self.autosave_action = QAction("Arbeitsbereich automatisch sichern", self)
+        self.autosave_action.setCheckable(True); self.autosave_action.setChecked(True)
+        self.autosave_action.toggled.connect(self._set_autosave); file_menu.addAction(self.autosave_action)
+        file_menu.addSeparator()
         self.export_action = self._action(file_menu, "Alle Seiten als neue PDF speichern …", QKeySequence.StandardKey.SaveAs, lambda: self.save_pdf(False), "export")
         self.split_action = self._action(file_menu, "Auswahl als neue PDF speichern …", "Ctrl+Shift+E", lambda: self.save_pdf(True), "export")
         self.separate_action = self._action(file_menu, "Auswahl als einzelne PDFs speichern …", None, self.save_separate_pages, "separate")
@@ -376,12 +387,19 @@ class MainWindow(QMainWindow):
         self.watermark_action = self._action(tools_menu, "Wasserzeichen …", None, self.edit_page_marks, "watermark")
         self.page_marks_action = self.watermark_action
         self.numbering_action = self._action(tools_menu, "Seitennummern …", None, lambda: self.edit_page_marks(mode="numbering"), "range")
-        help_menu = self.menuBar().addMenu("&Hilfe"); self._action(help_menu, "Über PDF Workbench", None, self.about)
+        tools_menu.addSeparator()
+        self.bookmarks_action = self._action(tools_menu, "Lesezeichen bearbeiten …", "Ctrl+Alt+B", self.edit_bookmarks, "list")
+        self.crop_action = self._action(tools_menu, "Seiten zuschneiden …", None, lambda: self.edit_page_geometry(mode="crop"), "select")
+        self.resize_pages_action = self._action(tools_menu, "Seitenformat ändern …", None, lambda: self.edit_page_geometry(mode="resize"), "document")
+        help_menu = self.menuBar().addMenu("&Hilfe")
+        self.update_action = self._action(help_menu, "Programm aktualisieren …", None, self.update_program)
+        self._action(help_menu, "Über PDF Workbench", None, self.about)
         document_tools = QMenu(self.document_tools_button)
         document_tools.addAction(self.images_action); document_tools.addSeparator()
         document_tools.addAction(self.compare_action); document_tools.addSeparator()
         document_tools.addAction(self.form_editor_action); document_tools.addAction(self.form_action)
         document_tools.addAction(self.watermark_action); document_tools.addAction(self.numbering_action)
+        document_tools.addAction(self.bookmarks_action); document_tools.addAction(self.crop_action); document_tools.addAction(self.resize_pages_action)
         document_tools.addAction(self.ocr_action)
         document_tools.addSeparator(); document_tools.addAction(self.compress_action); document_tools.addAction(self.protect_action)
         self.document_tools_menu = document_tools
@@ -429,6 +447,7 @@ class MainWindow(QMainWindow):
         self.organize_toolbar.setVisible(bool(self.workspace.pages))
         self.selection_changed(); self.load_preview(); self.update_controls(); self._update_title()
         self.search_bar.workspace_changed(self.workspace.pages)
+        self._session_changed()
         if ensure_visible and current:
             self.page_list.setFocus(Qt.FocusReason.OtherFocusReason)
             self.page_list.scrollToItem(current, QAbstractItemView.ScrollHint.EnsureVisible)
@@ -457,11 +476,15 @@ class MainWindow(QMainWindow):
         self.annotations_button.setText(f"Anmerkungen ({len(page.annotations)}) …")
 
     def _update_title(self):
-        self.setWindowTitle(f"{'* ' if tuple(self.workspace.pages) != self.saved_state else ''}PDF Workbench")
+        name = f"{self._project_path.name} · " if self._project_path else ""
+        self.setWindowTitle(f"{'* ' if self._is_dirty() else ''}{name}PDF Workbench")
 
     def update_controls(self):
         busy = self.job is not None or self._closing_requested
         selected, has_pages = bool(self.selected_ids()), bool(self.workspace.pages)
+        for action in (self.open_project_action, self.save_project_action, self.save_project_as_action, self.protect_project_action, self.update_action): action.setEnabled(not busy)
+        self.recovery_action.setEnabled(not busy and self._services_enabled)
+        for action in (self.bookmarks_action, self.crop_action, self.resize_pages_action): action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
         for widget in (self.open_button, self.empty_open_button, self.new_button, self.open_action, self.new_action): widget.setEnabled(not busy)
         self.page_list.setEnabled(not busy)
         for widget in (self.up_button, self.down_button, self.left_button, self.right_button, self.delete_button, self.duplicate_button, self.move_up_action, self.move_down_action, self.rotate_left_action, self.rotate_right_action, self.delete_action, self.duplicate_action, self.split_button, self.split_action, self.separate_button, self.separate_action): widget.setEnabled(selected and not busy)
@@ -648,6 +671,7 @@ class MainWindow(QMainWindow):
         current = self.page_list.currentRow() + 1
         self.summary.setText(f"{len(self.selected_ids())} ausgewählt" + (f" · Vorschau: Seite {current}" if current else " · Strg/Cmd oder Umschalt für Mehrfachauswahl"))
         self.update_controls()
+        self._session_changed()
 
     def set_view_mode(self, grid):
         self.page_list.set_grid_mode(grid)
@@ -663,6 +687,7 @@ class MainWindow(QMainWindow):
     def update_zoom_controls(self, factor, mode):
         self.zoom_combo.blockSignals(True); self.zoom_combo.setCurrentText(f"{round(factor * 100)} %"); self.zoom_combo.blockSignals(False)
         self.fit_page_button.setChecked(mode == "page"); self.fit_width_button.setChecked(mode == "width")
+        self._session_changed()
 
     def apply_zoom_text(self):
         try:
@@ -849,13 +874,15 @@ class MainWindow(QMainWindow):
         if not path.suffix: path = path.with_suffix(".pdf")
         sources, snapshot = dict(self.workspace.sources), tuple(self.workspace.pages)
         reports = []
-        export_options = {}
+        bookmarks = self.workspace.bookmarks
+        export_options = {"bookmarks": bookmarks}
         if password is not None: export_options["password"] = password
         if optimization is not None:
             export_options.update(optimization=optimization, compression_report=reports.append)
         def task(cancel, progress): return export_pdf(sources, pages, path, cancel, progress, **export_options)
         def success(saved):
-            if tuple(pages) == snapshot: self.saved_state = snapshot; self._update_title()
+            if tuple(pages) == snapshot:
+                self.saved_state = snapshot; self._saved_bookmarks = bookmarks; self._update_title()
             detail = " · Mit AES-256 geschützt" if password is not None else ""
             if reports:
                 report = reports[-1]
@@ -865,7 +892,7 @@ class MainWindow(QMainWindow):
 
     def compress_pdf(self):
         if self.job or not self.workspace.pages or self.preview.selection_pending: return
-        options = CompressionDialog.get_options(self, dict(self.workspace.sources), tuple(self.workspace.pages))
+        options = CompressionDialog.get_options(self, dict(self.workspace.sources), tuple(self.workspace.pages), bookmarks=self.workspace.bookmarks)
         if options is not None: self.save_pdf(False, optimization=options)
 
     def protect_pdf(self):
@@ -985,9 +1012,33 @@ class MainWindow(QMainWindow):
         if not pages: return
         destination = SeparateExportDialog.get_destination(self, len(pages))
         if destination is None: return
-        sources = dict(self.workspace.sources)
-        def task(cancel, progress): return export_pages_separately(sources, pages, destination, cancel, progress)
+        sources, bookmarks = dict(self.workspace.sources), self.workspace.bookmarks
+        def task(cancel, progress): return export_pages_separately(sources, pages, destination, cancel, progress, bookmarks=bookmarks)
         self.start_job(task, lambda saved: self.set_status(f"{len(pages)} einzelne PDFs gespeichert: {saved}"))
+
+    def edit_bookmarks(self):
+        if self.job or not self.workspace.pages or self.preview.selection_pending: return
+        from .ui.bookmarks_dialog import BookmarksDialog
+        result = BookmarksDialog.get_bookmarks(self, self.workspace, page_uid=self._active_uid)
+        if result is not None:
+            self.workspace.set_bookmarks(result); self.refresh()
+            self.set_status("Lesezeichen übernommen. Seitenziele folgen beim Umsortieren; Rückgängig ist verfügbar.")
+
+    def edit_page_geometry(self, *, mode="crop"):
+        if self.job or not self.workspace.pages or self.preview.selection_pending: return
+        from .ui.page_geometry_dialog import PageGeometryDialog
+        from .page_geometry import prepare_page_geometry
+        selected, active = self.selected_ids(), self._active_uid
+        request = PageGeometryDialog.get_request(self, self.workspace, selected, mode=mode)
+        if request is None: return
+        sources, pages = dict(self.workspace.sources), tuple(self.workspace.pages)
+        def task(cancel, progress):
+            return prepare_page_geometry(sources, pages, request.options, request.target_ids, cancel, progress)
+        def success(result):
+            self.workspace.apply_page_replacements(result.sources, result.pages); self.refresh(selected, active)
+            detail = " · " + " · ".join(result.warnings) if result.warnings else ""
+            self.set_status(f"{len(result.changed_ids)} Seite(n) angepasst. Rückgängig ist verfügbar.{detail}", "warning" if result.warnings else "success")
+        self.start_job(task, success)
 
     def save_searchable_pdf(self):
         if self.job or not self.workspace.pages or self.preview.selection_pending: return
@@ -995,21 +1046,21 @@ class MainWindow(QMainWindow):
         if request is None: return
         selected = self.selected_ids()
         pages = tuple(page for page in self.workspace.pages if request.scope == 'all' or page.uid in selected)
-        sources = dict(self.workspace.sources)
+        sources, bookmarks = dict(self.workspace.sources), self.workspace.bookmarks
         def task(cancel, progress):
             return export_searchable_pdf(sources, pages, request.destination, engine=request.engine,
                                          languages=request.languages, cache_dir=request.cache_dir,
-                                         dpi=request.dpi, timeout=request.timeout, cancel=cancel, progress=progress)
+                                         dpi=request.dpi, timeout=request.timeout, cancel=cancel, progress=progress, bookmarks=bookmarks)
         def success(result):
             self.set_status(f'Durchsuchbare PDF gespeichert: {result.path} · {result.processed_pages} Seite(n) erkannt, {result.skipped_pages} mit vorhandener Textschicht übersprungen.')
         self.start_job(task, success)
 
-    def confirm_discard(self):
-        if tuple(self.workspace.pages) == self.saved_state: return True
-        return QMessageBox.question(self, "Ungespeicherte Änderungen verwerfen?", "Die aktuelle Seitenanordnung und ihre Anmerkungen wurden noch nicht vollständig als PDF gespeichert. Verwerfen?\n\nDie Originaldateien bleiben erhalten.", QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
+    def confirm_discard(self, after_save=None):
+        return self._confirm_session_discard(after_save)
 
     def new_workspace(self):
-        if not self.job and self.confirm_discard():
+        if not self.job and self.confirm_discard(after_save=self.new_workspace):
+            self._reset_project_session()
             self.workspace = Workspace(); self.saved_state = (); self._active_uid = None
             self._pending_locked_files = []; self._form_field_cache.clear()
             self.preview.set_tool("pan"); self.pan_button.setChecked(True)
@@ -1019,16 +1070,16 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         if self.job:
             self.cancel_job(); self.set_status("Bitte den laufenden Abbruch abwarten und anschließend schließen."); event.ignore()
-        elif self.render_broker.is_closed and self.search_bar.is_closed:
-            event.accept()
+        elif self.render_broker.is_closed and self.search_bar.is_closed and self._background_closed():
+            self._finish_session(); event.accept()
         elif self._closing_requested:
             event.ignore()
-        elif self.confirm_discard():
-            self._closing_requested = True; self.update_controls(); self.render_broker.shutdown(); self.search_bar.shutdown(); event.ignore()
+        elif self.confirm_discard(after_save=self.close):
+            self._closing_requested = True; self._stop_background_services(); self.update_controls(); self.render_broker.shutdown(); self.search_bar.shutdown(); event.ignore()
         else: event.ignore()
 
     def _rendering_closed(self):
-        if self._closing_requested and self.render_broker.is_closed and self.search_bar.is_closed: self.close()
+        if self._closing_requested and self.render_broker.is_closed and self.search_bar.is_closed and self._background_closed(): self.close()
 
     def show_error(self, title, detail):
         self.set_status(title, "error")
@@ -1038,7 +1089,22 @@ class MainWindow(QMainWindow):
         box.exec()
 
     def about(self):
-        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Komprimierung, Passwortschutz und PDF-Versionsvergleich.<br>Formulare mit Textfeldern, Kontrollkästchen, Dropdowns<br>und Optionsgruppen gestalten und ausfüllen.<br>Wasserzeichen und Seitennummern mit Vorschau.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>XFA, Skripte und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
+        QMessageBox.about(self, "Über PDF Workbench",
+            f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>"
+            "Seiten ordnen, zusammenfügen, trennen, drehen und zuschneiden.<br>"
+            "Seitenformate, Lesezeichen, eigene Objekte und Anmerkungen.<br>"
+            "Komprimierung, Passwortschutz und PDF-Versionsvergleich.<br>"
+            "Formulare gestalten und ausfüllen, Wasserzeichen und Seitennummern.<br>"
+            "Projekte mit Undo-Historie, Autosave und Programmupdates.<br>"
+            "Suche, Bildimport und optionale lokale OCR mit Tesseract.<br><br>"
+            "GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>"
+            "Liberation Sans · SIL Open Font License<br>"
+            "Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>"
+            "Zuschneiden ist keine Schwärzung. XFA, Skripte und<br>"
+            "Zertifikatssignaturen sind nicht unterstützt. Sichere Lesezeichen<br>"
+            "auf enthaltene Seiten werden übernommen; externe Aktionen,<br>"
+            "Tags und Anhänge nicht. PDF/A ist nicht garantiert.<br><br>"
+            "Unabhängiges Projekt ohne Adobe-Programmcode.")
 
     def dragEnterEvent(self, event):
         if not self.job and event.mimeData().hasUrls(): event.acceptProposedAction()
@@ -1053,13 +1119,24 @@ STYLE = stylesheet("light")
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("--apply-update", "--update-probe"):
+        from .update_installer import apply_update_cli, probe_update_cli
+        return (apply_update_cli if argv[0] == "--apply-update" else probe_update_cli)(argv[1:])
     parser = argparse.ArgumentParser(description="PDF Workbench – lokale PDF-Seitenverwaltung")
-    parser.add_argument("pdfs", nargs="*", help="PDF-Dateien beim Start hinzufügen")
+    parser.add_argument("--update-started", nargs=2, metavar=("PLAN", "TOKEN"), help=argparse.SUPPRESS)
+    parser.add_argument("pdfs", nargs="*", help="PDF-Dateien hinzufügen oder ein .pdfwb-Projekt öffnen")
     args = parser.parse_args(argv)
     app = QApplication([sys.argv[0]])
     app.setApplicationName("PDF Workbench"); app.setApplicationVersion(__version__); app.setOrganizationName("PDF Workbench")
     app.setStyle("Fusion")
     theme_controller(app)
     window = MainWindow(); window.show()
-    if args.pdfs: QTimer.singleShot(0, lambda: window.import_files(args.pdfs))
+    if args.update_started:
+        from .update_installer import mark_update_started
+        QTimer.singleShot(0, lambda: mark_update_started(*args.update_started))
+    window.enable_background_services(prompt_recovery=not args.pdfs)
+    if len(args.pdfs) == 1 and Path(args.pdfs[0]).suffix.lower() == ".pdfwb":
+        QTimer.singleShot(0, lambda: window.open_project(path=args.pdfs[0]))
+    elif args.pdfs: QTimer.singleShot(0, lambda: window.import_files(args.pdfs))
     return app.exec()

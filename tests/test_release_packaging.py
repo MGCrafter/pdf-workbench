@@ -181,6 +181,30 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.verify(target)
 
+    def test_v08_requires_all_new_native_feature_checks_on_both_platforms(self):
+        self.version = self.provenance['app_version'] = '0.8.0'
+        previous = ['appearance dark/light/system', 'appearance persisted',
+                    'appearance preserves document and viewport', 'appearance document/export colors',
+                    'appearance dialogs and icons', 'objects select/move/duplicate/delete/undo',
+                    'objects text/image/stamp/symbol PDF roundtrip', 'objects bundled font and Unicode',
+                    'asynchronous text search', 'images to PDF and undo',
+                    'local OCR searchable text and preserved image']
+        core_checks = release.V06_CORE_CHECKS | release.V07_CORE_CHECKS | release.V08_CORE_CHECKS
+        gui_checks = release.V06_GUI_CHECKS | release.V07_GUI_CHECKS | release.V08_GUI_CHECKS
+        for target, platform_name in (('linux', 'xcb'), ('win32', 'windows')):
+            report, _ = self.prepare(target, platform_name)
+            report['core'].update(tests=23, checks=sorted(core_checks))
+            report['gui']['checks'] = previous + sorted(gui_checks)
+            self.write_report(report); self.assertEqual(self.verify(target), report)
+            for section, required in (('core', release.V08_CORE_CHECKS), ('gui', release.V08_GUI_CHECKS)):
+                for missing in required:
+                    invalid = copy.deepcopy(report); invalid[section]['checks'].remove(missing)
+                    self.write_report(invalid)
+                    with self.subTest(target=target, section=section, missing=missing), self.assertRaises(ValueError):
+                        self.verify(target)
+            report['core']['tests'] = 22; self.write_report(report)
+            with self.assertRaises(ValueError): self.verify(target)
+
     def test_previous_build_cannot_be_released_as_a_different_checkout(self):
         self.prepare()
         identities = {
