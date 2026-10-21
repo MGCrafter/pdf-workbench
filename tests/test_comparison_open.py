@@ -65,7 +65,8 @@ class ComparisonOpenTests(unittest.TestCase):
         originals = [path.read_bytes() for path in self.paths]
         self.window.compare_pdfs(paths=self.paths)
         wait(lambda: self.dialog.called and self.window.job is None)
-        self.assertEqual([source.path for source in self.dialog.call_args.args[:2]], self.paths)
+        self.assertEqual([source.path for source in self.dialog.call_args.args[:2]],
+                         [path.resolve() for path in self.paths])
         self.assertEqual(self.window.workspace.pages, [])
         self.assertFalse(self.window.workspace.can_undo)
         self.assertEqual([path.read_bytes() for path in self.paths], originals)
