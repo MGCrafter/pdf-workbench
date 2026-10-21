@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -250,6 +251,75 @@ class ReleaseLayoutTests(unittest.TestCase):
             self.prepare()
         self.assertFalse(self.output.exists())
         self.assertEqual((self.input / "SHA256SUMS").read_bytes(), before)
+
+    def stat_record(self, **changes):
+        info = (self.input / "source-manifest.json").lstat()
+        fields = ("st_mode", "st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+        result = {name: getattr(info, name) for name in fields}
+        result.update(changes)
+        return SimpleNamespace(**result)
+
+    def test_windows_path_creation_time_and_descriptor_change_time_can_differ(self):
+        # CPython #157671: both API calls identify the exact same NTFS file but
+        # expose different meanings for st_ctime_ns. Each API stays consistent.
+        by_path = self.stat_record(st_ctime_ns=1000)
+        by_fd = self.stat_record(st_ctime_ns=2000)
+        target = self.input / "source-manifest.json"
+        with patch.object(Path, "lstat", side_effect=[by_path, by_path]), \
+                patch.object(layout.os, "fstat", side_effect=[by_fd, by_fd]):
+            with layout._regular_file(target) as (stream, opened):
+                self.assertEqual(stream.read(), self.files[target.name])
+                self.assertIs(opened, by_fd)
+
+    def test_metadata_changes_within_either_stat_api_still_reject_input(self):
+        target = self.input / "source-manifest.json"
+        by_path = self.stat_record(st_ctime_ns=1000)
+        by_fd = self.stat_record(st_ctime_ns=2000)
+        changed_path = self.stat_record(st_ctime_ns=1001)
+        changed_fd = self.stat_record(st_ctime_ns=2001)
+        for paths, descriptors, message in (
+            ([by_path, changed_path], [by_fd, by_fd], "replaced while reading"),
+            ([by_path, by_path], [by_fd, changed_fd], "changed while reading"),
+        ):
+            with self.subTest(message=message), \
+                    patch.object(Path, "lstat", side_effect=paths), \
+                    patch.object(layout.os, "fstat", side_effect=descriptors), \
+                    self.assertRaisesRegex(ValueError, message):
+                with layout._regular_file(target) as (stream, _):
+                    stream.read()
+
+    def test_cross_api_file_id_size_and_modification_time_must_still_match(self):
+        target = self.input / "source-manifest.json"
+        by_path = self.stat_record(st_ctime_ns=1000)
+        for field in ("st_dev", "st_ino", "st_size", "st_mtime_ns"):
+            by_fd = self.stat_record(st_ctime_ns=2000, **{field: getattr(by_path, field) + 1})
+            with self.subTest(field=field), \
+                    patch.object(Path, "lstat", return_value=by_path), \
+                    patch.object(layout.os, "fstat", return_value=by_fd), \
+                    self.assertRaisesRegex(ValueError, "changed while opening"):
+                with layout._regular_file(target):
+                    self.fail("A mismatched descriptor must not be exposed")
+
+    def test_same_bytes_size_and_mtime_replacement_before_open_is_rejected(self):
+        target = self.input / "source-manifest.json"
+        original_bytes = target.read_bytes()
+        original_stat = target.stat()
+        original_open = layout.os.open
+        saved = self.root / "preserved-original-manifest.json"
+
+        def replace_before_open(path, flags, *args, **kwargs):
+            # This happens before opening, so it works without Windows delete
+            # sharing and preserves both original and foreign file contents.
+            target.rename(saved)
+            target.write_bytes(original_bytes)
+            os.utime(target, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+            return original_open(path, flags, *args, **kwargs)
+
+        with patch.object(layout.os, "open", side_effect=replace_before_open), \
+                self.assertRaisesRegex(ValueError, "changed while opening"):
+            layout._hash_file(target)
+        self.assertEqual(saved.read_bytes(), original_bytes)
+        self.assertEqual(target.read_bytes(), original_bytes)
 
     def test_readback_rejects_duplicate_missing_links_and_changed_member_bytes(self):
         result = self.prepare()

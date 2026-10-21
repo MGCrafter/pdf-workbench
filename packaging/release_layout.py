@@ -37,7 +37,16 @@ def _plain_name(name: object) -> str:
 
 
 def _identity(info: os.stat_result) -> tuple:
-    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    # CPython on Windows can expose creation time through lstat().st_ctime_ns
+    # and metadata-change time through fstat().st_ctime_ns for the same file:
+    # https://github.com/python/cpython/issues/157671
+    # Compare portable file/content identity across APIs, and retain ctime in
+    # the separate before/after checks within each API below.
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+
+
+def _snapshot(info: os.stat_result) -> tuple:
+    return (*_identity(info), info.st_ctime_ns)
 
 
 @contextmanager
@@ -51,13 +60,13 @@ def _regular_file(path: Path):
         if not stat.S_ISREG(opened.st_mode) or _identity(opened) != _identity(before):
             raise ValueError(f"Release input changed while opening: {path.name}")
         yield stream, opened
-        if _identity(os.fstat(stream.fileno())) != _identity(opened):
+        if _snapshot(os.fstat(stream.fileno())) != _snapshot(opened):
             raise ValueError(f"Release input changed while reading: {path.name}")
         try:
             current = path.lstat()
         except FileNotFoundError as exc:
             raise ValueError(f"Release input disappeared while reading: {path.name}") from exc
-        if _identity(current) != _identity(opened) or not stat.S_ISREG(current.st_mode):
+        if _snapshot(current) != _snapshot(before) or not stat.S_ISREG(current.st_mode):
             raise ValueError(f"Release input was replaced while reading: {path.name}")
 
 
