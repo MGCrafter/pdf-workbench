@@ -44,7 +44,7 @@ def verify_notices(directory: Path) -> dict:
         raise ValueError('Release notices are incomplete; run packaging/collect_notices.py first.')
     from PyQt6.QtCore import qVersion
     versions = {'Qt': qVersion(), **{name: importlib.metadata.version(name) for name in
-                ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography')}}
+                ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography', 'cffi')}}
     for name, version in versions.items():
         if manifest.get('versions', {}).get(name) != version:
             raise ValueError(f'Notices describe a different {name} version.')
@@ -80,12 +80,14 @@ def main():
     else:
         notice_data = ['--add-data', f'{ROOT / "licenses" / "pypdf-LICENSE"}:licenses']
     subprocess.run([
-        sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
+        sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed', '--noupx',
         '--onedir', '--name', 'PDFWorkbench', '--paths', str(ROOT / 'src'),
         '--paths', str(ROOT / 'packaging'),
         '--distpath', str(distpath), '--workpath', str(workpath), '--specpath', str(workpath),
         '--copy-metadata', 'pypdf', '--copy-metadata', 'PyQt6',
         '--copy-metadata', 'Pillow', '--copy-metadata', 'cryptography',
+        '--copy-metadata', 'cffi',
+        '--exclude-module', 'PIL.AvifImagePlugin', '--exclude-module', 'PIL._avif',
         '--add-data', f'{ROOT / "LICENSE"}:.',
         '--add-data', f'{ROOT / "THIRD_PARTY_NOTICES.md"}:.',
         '--add-data', f'{provenance_path}:.',

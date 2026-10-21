@@ -12,6 +12,8 @@ Third-party components retain their own copyrights and licenses.
 | pypdf 6.10.0 | BSD-3-Clause | PDF import and export |
 | Pillow 12.3.0 | MIT-CMU, with bundled-library notices | Conservative PDF image recompression |
 | cryptography 50.0.1 | Apache-2.0 OR BSD-3-Clause, with bundled-library notices | AES-256 PDF encryption and decryption |
+| CFFI 2.1.1 and libffi | MIT-0 / original libffi MIT terms | Native cryptography binding runtime |
+| Rust libraries and OpenSSL embedded in cryptography | Original component licenses and exact SBOM/source records | Cryptography's native implementation |
 | Liberation Sans Regular 2.1.5 | SIL Open Font License 1.1 | Embedded font for editable text fields |
 | CPython | PSF license and its included third-party notices | Bundled Python interpreter and standard library |
 | PyInstaller 6.22.3 | GPL-2.0-or-later with its bootloader exception | Bundle bootloader and build tool |

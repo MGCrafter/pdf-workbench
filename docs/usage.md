@@ -101,7 +101,7 @@ oder dunklen Erscheinungsbild des Betriebssystems, auch wenn es während der
 Benutzung wechselt. Ein manueller Wechsel verändert weder die PDF-Farben noch
 Zoom, Scrollposition oder den Verlauf deiner Änderungen.
 
-**Ansicht → Bewegung reduzieren** schaltet die kurzen Übergänge ab. Diese
+**Ansicht → Darstellung → Bewegung reduzieren** schaltet die kurzen Übergänge ab. Diese
 Einstellung bleibt gespeichert. Unter Windows und GNOME berücksichtigt die App
 auch erkannte Systemeinstellungen für reduzierte Bewegung.
 

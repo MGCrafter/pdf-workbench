@@ -73,8 +73,10 @@ jobs:
                   raise SystemExit('Required native build or sources job did not pass: ' + name)
           artifacts = [item for page in api(endpoint + '/artifacts?per_page=100', True) for item in page['artifacts']]
           names = {'app-linux', 'app-windows', 'sources', 'native-sources'}
+          if tuple(map(int, tag[1:].split('.')[:2])) >= (0, 6):
+              names |= {'runtime-linux', 'runtime-windows'}
           if len(artifacts) != len(names) or {item['name'] for item in artifacts} != names:
-              raise SystemExit('Expected exactly the four verified release artifacts')
+              raise SystemExit('Expected exactly the version-specific verified release artifacts')
           if any(item['expired'] or item['size_in_bytes'] <= 0 for item in artifacts):
               raise SystemExit('A required release artifact is expired or empty')
           print('Verified native builds, source job and artifacts for', tag, commit)

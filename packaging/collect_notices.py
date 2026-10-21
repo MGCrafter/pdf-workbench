@@ -13,6 +13,7 @@ from email.utils import parsedate_to_datetime
 import errno
 import http.client
 import hashlib
+import importlib.util
 from importlib import metadata
 import json
 from pathlib import Path, PurePosixPath
@@ -24,6 +25,7 @@ import ssl
 import subprocess
 import sys
 import sysconfig
+import tarfile
 import time
 import urllib.error
 import urllib.parse
@@ -44,6 +46,34 @@ COVERED_QT_MODULES |= frozenset(("EglFsKmsGbmSupport", "EglFsKmsSupport", "WlShe
 
 class IncompleteNotices(RuntimeError):
     pass
+
+
+def runtime_wheels():
+    """Load the sibling audit module also when tests import this file by path."""
+    spec = importlib.util.spec_from_file_location("pdf_workbench_runtime_wheels", ROOT / "packaging/runtime_wheels.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def merge_runtime_sources(sources: list[dict], inventories: list[dict]) -> list[dict]:
+    module = runtime_wheels()
+    additions = []
+    for inventory in inventories:
+        if inventory.get("schema_version") != 1:
+            raise IncompleteNotices("Unsupported platform runtime inventory")
+        additions.extend(inventory.get("source_archives", []))
+    try:
+        additions = module.merge_source_records(additions)
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
+    by_name = {item["filename"]: item for item in sources}
+    for item in additions:
+        previous = by_name.get(item["filename"])
+        if previous and previous["sha256"] != item["sha256"]:
+            raise IncompleteNotices("Conflicting runtime-source filenames")
+        by_name[item["filename"]] = item
+    return [by_name[key] for key in sorted(by_name)]
 
 
 def sha256(path: Path) -> str:
@@ -207,7 +237,7 @@ def release_pins() -> dict[str, str]:
 
 def collect_distributions(output: Path) -> tuple[dict, list]:
     pins = release_pins()
-    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib", "pillow", "cryptography"}
+    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib", "pillow", "cryptography", "cffi", "pycparser"}
     versions, inventory = {}, []
     for dist in sorted(metadata.distributions(), key=lambda d: normalized_name(d.metadata.get("Name", ""))):
         name = dist.metadata.get("Name")
@@ -236,7 +266,7 @@ def collect_distributions(output: Path) -> tuple[dict, list]:
     if not required <= found:
         raise IncompleteNotices(f"Missing release distributions: {sorted(required-found)}")
     # Record predictable keys regardless of wheel metadata capitalization.
-    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography")}
+    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser")}
     from PyQt6.QtCore import qVersion, PYQT_VERSION_STR
     versions.update({"Qt": qVersion(), "Python": platform.python_version()})
     if versions["Qt"] != QT_VERSION or PYQT_VERSION_STR != versions["PyQt6"]:
@@ -315,7 +345,7 @@ def collect_system_notices(output: Path) -> None:
 
 def source_archives(versions: dict, lock: dict) -> list[dict]:
     result = [dict(lock["qt_source_archive"])]
-    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography"):
+    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser"):
         version = versions[package]
         data = json.loads(fetch(f"https://pypi.org/pypi/{package}/{version}/json"))
         sdists = [item for item in data["urls"] if item["packagetype"] == "sdist"]
@@ -336,7 +366,7 @@ def source_archives(versions: dict, lock: dict) -> list[dict]:
     return result
 
 
-def native_source_inventory(toc: Path) -> dict:
+def native_source_inventory(toc: Path, runtime_inventory: dict | None = None) -> dict:
     """Map actually collected ELF files to exact Ubuntu source packages."""
     if sys.platform != "linux" or not shutil.which("dpkg-query"):
         raise IncompleteNotices("Native source inventory requires the Ubuntu release builder")
@@ -360,6 +390,15 @@ def native_source_inventory(toc: Path) -> dict:
     for source in sorted(sources):
         path = source.resolve()
         parts = path.parts
+        if runtime_inventory is not None:
+            module = runtime_wheels()
+            try:
+                provider = module.native_provider(source, runtime_inventory)
+            except module.RuntimeAuditError as error:
+                raise IncompleteNotices(str(error)) from error
+            if provider is not None:
+                exclusions.append(provider)
+                continue
         if "PyQt6" in parts or "PyInstaller" in parts:
             exclusions.append({"path": str(source), "reason": "Matching Qt/PyQt/PyInstaller source archives"})
             continue
@@ -496,6 +535,16 @@ def download_sources(items: list[dict], destination: Path) -> None:
                 raise IncompleteNotices(f"Source digest mismatch: {filename}")
             if item.get("size") and size != item["size"]:
                 raise IncompleteNotices(f"Source size mismatch: {filename}")
+            if expected is None and item.get("digest_source") == runtime_wheels().CALCULATED_DIGEST:
+                # Pinning a release-tag URL is not a digest. Before recording
+                # its cloud-calculated hash, ensure a mirror did not return a
+                # successful HTML error/login page instead of the source tar.
+                try:
+                    with tarfile.open(temporary, "r:*") as archive:
+                        if archive.next() is None:
+                            raise IncompleteNotices(f"Empty calculated source archive: {filename}")
+                except tarfile.TarError as error:
+                    raise IncompleteNotices(f"Calculated source is not a readable archive: {filename}") from error
             temporary.replace(path)
             item.update(sha256=actual, size=size)
         finally:
@@ -514,6 +563,15 @@ def verify_bundle(bundle: Path, notices: Path) -> dict:
         path = notices / safe_relative(relative)
         if not path.resolve().is_relative_to(notices.resolve()) or path.is_symlink() or not path.is_file() or sha256(path) != expected:
             raise IncompleteNotices(f"Notice manifest mismatch: {relative}")
+    runtime_path = notices / "runtime-wheels.json"
+    inventory = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else None
+    if inventory is not None and "runtime-wheels.json" not in manifest["files"]:
+        raise IncompleteNotices("Runtime-wheel inventory is not bound to the notice manifest")
+    module = runtime_wheels()
+    try:
+        runtime = module.verify_frozen_runtime(bundle, inventory)
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
     modules = set()
     for path in bundle.rglob("*"):
         match = re.match(r"(?:lib)?Qt6([A-Za-z0-9]+)(?:\.so(?:\..*)?|\.dll)$", path.name)
@@ -524,7 +582,7 @@ def verify_bundle(bundle: Path, notices: Path) -> dict:
     unknown = modules - COVERED_QT_MODULES
     if unknown:
         raise IncompleteNotices(f"Native Qt modules need a new attribution/source audit: {sorted(unknown)}")
-    return {"verified": True, "qt_modules": sorted(modules)}
+    return {"verified": True, "qt_modules": sorted(modules), "runtime_extensions": runtime}
 
 
 def main() -> int:
@@ -534,6 +592,8 @@ def main() -> int:
     parser.add_argument("--verify-bundle", type=Path)
     parser.add_argument("--native-toc", type=Path, help="Emit native-sources.json from a completed Ubuntu Analysis-00.toc")
     parser.add_argument("--native-sources", type=Path, help="Include the Ubuntu build's native-sources.json in source acquisition")
+    parser.add_argument("--runtime-sources", type=Path, action="append", default=[],
+                        help="Merge a native builder's runtime-wheels.json source records (repeat for Windows/Linux)")
     args = parser.parse_args()
     output = args.output.resolve()
     if args.native_toc:
@@ -542,7 +602,11 @@ def main() -> int:
         if manifest.get("schema_version") != 1 or manifest.get("complete") is not True:
             raise IncompleteNotices("Native source audit requires complete existing notices")
         manifest_path.unlink()
-        inventory = native_source_inventory(args.native_toc.resolve())
+        runtime_path = output / "runtime-wheels.json"
+        if not runtime_path.is_file() or manifest.get("files", {}).get("runtime-wheels.json") != sha256(runtime_path):
+            raise IncompleteNotices("Native source audit requires its matching runtime-wheel inventory")
+        runtime_inventory = json.loads(runtime_path.read_text(encoding="utf-8"))
+        inventory = native_source_inventory(args.native_toc.resolve(), runtime_inventory)
         archives = ubuntu_source_archives(inventory)
         put(output, "native-sources.json", (json.dumps(inventory, indent=2) + "\n").encode())
         manifest["files"]["native-sources.json"] = sha256(output / "native-sources.json")
@@ -568,6 +632,15 @@ def main() -> int:
     collect_python(output, versions["Python"])
     collect_system_notices(output)
     sources = source_archives(versions, lock)
+    module = runtime_wheels()
+    try:
+        runtime_inventory = module.collect_runtime_notices(output, fetch)
+    except module.RuntimeAuditError as error:
+        raise IncompleteNotices(str(error)) from error
+    platform_inventories = [runtime_inventory]
+    for path in args.runtime_sources:
+        platform_inventories.append(json.loads(path.read_text(encoding="utf-8")))
+    sources = merge_runtime_sources(sources, platform_inventories)
     if args.native_sources:
         inventory = json.loads(args.native_sources.read_text(encoding="utf-8"))
         sources.extend(ubuntu_source_archives(inventory))

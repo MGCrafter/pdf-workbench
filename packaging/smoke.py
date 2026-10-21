@@ -654,6 +654,8 @@ def gui_acceptance(directory: Path):
             return image
         assert render_pdf(edited_output) == render_pdf(themed_output), 'Theme changed exported document colors'
         feature_checks, ocr_info = feature_acceptance(window, directory, app, wait_for)
+        from upgrade_smoke import upgrade_acceptance
+        feature_checks += upgrade_acceptance(window, directory, app, wait_for, fixture)
         preview.fit_page(); app.processEvents()
         wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
@@ -691,7 +693,8 @@ def main():
         try:
             PdfAcceptance.base = run
             result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(PdfAcceptance))
-            report["core"] = {"tests": result.testsRun, "failures": len(result.failures), "errors": len(result.errors), "skipped": [(str(test), reason) for test, reason in result.skipped]}
+            report["core"] = {"tests": result.testsRun, "failures": len(result.failures), "errors": len(result.errors), "skipped": [(str(test), reason) for test, reason in result.skipped],
+                              "checks": unittest.defaultTestLoader.getTestCaseNames(PdfAcceptance)}
             if not result.wasSuccessful(): raise AssertionError("PDF acceptance tests failed; see test.log")
             report["gui"] = gui_acceptance(run)
             report["result"] = "PASS"

@@ -1,6 +1,6 @@
 # Änderungen
 
-## 0.6.0 (lokaler Entwicklungsstand, noch nicht veröffentlicht)
+## 0.6.0
 
 - Neue Startansicht, ruhigere helle und dunkle Oberflächen, gruppierte Werkzeuge
   und kurze Animationen. Unter Ansicht lassen sich Animationen abschalten;
@@ -12,6 +12,9 @@
 - Normale AcroForms mit Textfeldern, Kontrollkästchen und Einfachauswahl
   ausfüllen. Undo, Seitensortierung, Duplikate und erneutes Öffnen sind geprüft.
   XFA, Signaturfelder, Skripte und weitere Spezialfälle werden abgewiesen.
+- Release-Prüfungen verlangen die neuen Werkzeuge auch innerhalb der fertigen
+  Windows-/Linux-App. Bildbibliotheken und Verschlüsselung haben eigene
+  versionsgebundene Lizenz- und Quellnachweise für beide Plattformen.
 
 ## 0.5.3
 

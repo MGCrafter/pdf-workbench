@@ -4,19 +4,15 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-Der Quellcode enthält den noch unveröffentlichten Entwicklungsstand **0.6.0**
-mit neuer Oberfläche, Komprimierung, Passwortschutz und Formularausfüllung.
-Die öffentlichen Downloads unten bleiben bei **0.5.3** und enthalten diese
-Erweiterungen noch nicht.
-
-![PDF Workbench im Dark Mode mit Textfeldern, einem Bild, einem Stempel und Symbolen](docs/assets/screenshot.png)
+**Version 0.6.0** ergänzt eine neue Oberfläche, Komprimierung, Passwortschutz
+und das Ausfüllen vorhandener PDF-Formulare.
 
 ## Download
 
-| System | Download für v0.5.3 |
+| System | Download für v0.6.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.3/PDFWorkbench-v0.5.3-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.5.3/PDFWorkbench-v0.5.3-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.6.0/PDFWorkbench-v0.6.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.6.0/PDFWorkbench-v0.6.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -31,7 +27,7 @@ bleiben.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.5.3-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.6.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
