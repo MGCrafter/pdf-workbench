@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build import verify_notices
 from collect_notices import verify_bundle
-from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS
+from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS
 
 
 def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, source_hashes: dict) -> dict:
@@ -61,6 +61,11 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
             raise ValueError('Complete native comparison/form-design/page-marks PDF acceptance is required.')
         if not V07_GUI_CHECKS <= set(gui.get('checks', [])):
             raise ValueError('Complete native comparison/form-design/page-marks GUI acceptance is required.')
+    if tuple(int(part) for part in version.split('.')[:2]) >= (0, 8):
+        if core.get('tests', 0) < 23 or not V08_CORE_CHECKS <= set(core.get('checks', [])):
+            raise ValueError('Complete native bookmarks/geometry/project/recovery/update PDF acceptance is required.')
+        if not V08_GUI_CHECKS <= set(gui.get('checks', [])):
+            raise ValueError('Complete native bookmarks/geometry/project/autosave/updater GUI acceptance is required.')
     return report
 
 
@@ -114,12 +119,23 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                     'Datei > Durchsuchbare PDF erstellen nutzt optional eine lokale Tesseract-Installation.\n'
                     'Ansicht > Darstellung bietet System, Hell und Dunkel.\n'
                     'Werkzeuge bietet PDF-Komprimierung, Passwortschutz und das Ausfüllen vorhandener Formulare.\n'
+                    'Werkzeuge > Lesezeichen bearbeitet Kapitel und Unterkapitel.\n'
+                    'Seiten zuschneiden und Seitenformat ändern bieten eine echte PDF-Vorschau.\n'
+                    'Strg+S speichert ein Projekt mit eingebetteten PDFs und Rückgängig-Historie.\n'
+                    'Unter Datei lassen sich Projekte öffnen und automatische Sicherungen wiederherstellen.\n'
+                    'Hilfe > Programm aktualisieren prüft, lädt und installiert neue Versionen nach Bestätigung.\n'
                     'Normale Exporte übernehmen einen Quellpasswortschutz nicht automatisch.\n'
                     'Ansicht > Darstellung > Bewegung reduzieren schaltet kurze Animationen ab.\n'
                     'PDF speichern schreibt eine neue Datei; Originale werden nicht geändert.\n\n'
                     'Anleitung: https://github.com/MGCrafter/pdf-workbench#loslegen\n'
                     'Quellcode und Drittanbieterquellen: https://github.com/MGCrafter/pdf-workbench/releases\n')
     (bundle / 'START_HERE.txt').write_text(instructions, encoding='utf-8')
+    # Last mutation of the app bundle: inventory includes provenance, final
+    # audited notices and the startup instructions in the public archive.
+    sys.path.insert(0, str(ROOT / 'src'))
+    from pdf_workbench.update_installer import write_bundle_manifest, validate_bundle
+    write_bundle_manifest(bundle, app_version=version)
+    validate_bundle(bundle, expected_version=version)
     output.mkdir(parents=True, exist_ok=True)
     suffix = '.zip' if target == 'windows' else '.tar.gz'
     archive = output / f'PDFWorkbench-v{version}-{target}-x86_64{suffix}'

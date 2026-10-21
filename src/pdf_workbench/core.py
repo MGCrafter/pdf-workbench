@@ -21,6 +21,10 @@ from pypdf import PdfReader, PdfWriter
 from . import __version__
 from .annotations import AnnotationError, PageAnnotation, add_pdf_annotations, extract_own_annotations
 from .compression import CompressionOptions, CompressionReport, compress_writer
+from .bookmarks import (SourceBookmark, WorkspaceBookmark, bookmarks_for_sources,
+                        bookmark_location, delete_bookmark, insert_bookmark, move_bookmark, replace_bookmark,
+                        prune_bookmarks, read_source_bookmarks, source_to_workspace,
+                        validate_bookmarks, validate_source_bookmarks, write_bookmarks)
 
 
 class PdfWorkbenchError(Exception):
@@ -58,6 +62,12 @@ class SourceDocument:
     page_annotations: tuple[tuple[PageAnnotation, ...], ...] = ()
     was_encrypted: bool = False
     original_size: int = 0
+    bookmarks: tuple[SourceBookmark, ...] = ()
+    bookmark_warnings: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self,"bookmarks",tuple(self.bookmarks))
+        object.__setattr__(self,"bookmark_warnings",tuple(self.bookmark_warnings))
 
     @property
     def label(self) -> str:
@@ -76,6 +86,18 @@ class PageRef:
         object.__setattr__(self, "annotations", tuple(self.annotations))
         if any(not isinstance(item, PageAnnotation) for item in self.annotations):
             raise PdfWorkbenchError("Eine Seitenanmerkung ist ungültig.")
+
+
+@dataclass(frozen=True)
+class WorkspaceState:
+    """Complete immutable session, including sources retained for undo/protection."""
+    sources: tuple[SourceDocument,...]
+    pages: tuple[PageRef,...]
+    bookmarks: tuple[WorkspaceBookmark,...] = ()
+    undo: tuple[tuple[PageRef,...],...] = ()
+    redo: tuple[tuple[PageRef,...],...] = ()
+    undo_bookmarks: tuple[tuple[WorkspaceBookmark,...],...] = ()
+    redo_bookmarks: tuple[tuple[WorkspaceBookmark,...],...] = ()
 
 
 def load_source(path: str | Path, cancel: CancelCheck | None = None, *,
@@ -122,6 +144,7 @@ def load_source(path: str | Path, cancel: CancelCheck | None = None, *,
                 raise PdfWorkbenchError("Diese PDF enthält eine Seite mit ungültigen Abmessungen (MediaBox).")
             sizes.append(size)
         page_annotations, stripped = extract_own_annotations(reader)
+        bookmarks, bookmark_warnings = read_source_bookmarks(reader,cancel)
         if stripped or was_encrypted:
             _check_cancel(cancel)
             base = PdfWriter()
@@ -131,7 +154,7 @@ def load_source(path: str | Path, cancel: CancelCheck | None = None, *,
             data = stream.getvalue()
         _check_cancel(cancel)
         return SourceDocument(uuid4().hex, source_path, data, len(sizes), tuple(sizes), page_annotations,
-                              was_encrypted, original_size)
+                              was_encrypted, original_size, bookmarks, bookmark_warnings)
     except (PdfWorkbenchError, OperationCancelled):
         raise
     except OSError as exc:
@@ -148,6 +171,9 @@ class Workspace:
         self.pages: list[PageRef] = []
         self._undo: list[tuple[PageRef, ...]] = []
         self._redo: list[tuple[PageRef, ...]] = []
+        self.bookmarks: tuple[WorkspaceBookmark,...] = ()
+        self._undo_bookmarks: list[tuple[WorkspaceBookmark,...]] = []
+        self._redo_bookmarks: list[tuple[WorkspaceBookmark,...]] = []
 
     @property
     def can_undo(self) -> bool:
@@ -157,23 +183,91 @@ class Workspace:
     def can_redo(self) -> bool:
         return bool(self._redo)
 
-    def _set(self, pages: Sequence[PageRef]) -> None:
-        if list(pages) == self.pages:
+    def _set(self, pages: Sequence[PageRef], bookmarks=None) -> None:
+        bookmarks=(prune_bookmarks(self.bookmarks,{page.uid for page in pages}) if bookmarks is None else tuple(bookmarks))
+        validate_bookmarks(bookmarks,{page.uid for page in pages})
+        if list(pages) == self.pages and bookmarks==self.bookmarks:
             return
         self._undo.append(tuple(self.pages))
+        self._undo_bookmarks.append(self.bookmarks)
         self._undo = self._undo[-50:]
+        self._undo_bookmarks = self._undo_bookmarks[-50:]
         self._redo.clear()
+        self._redo_bookmarks.clear()
         self.pages = list(pages)
+        self.bookmarks = bookmarks
 
     def add_sources(self, sources: Iterable[SourceDocument]) -> list[str]:
-        new_pages = []
+        new_pages = []; imported=[];additions={}
         for source in sources:
-            self.sources[source.source_id] = source
-            new_pages.extend(PageRef(uuid4().hex, source.source_id, i, annotations=(
+            previous=additions.get(source.source_id,self.sources.get(source.source_id))
+            if previous is not None and previous!=source:raise PdfWorkbenchError("Eine vorhandene PDF-Quelle darf nicht verändert werden.")
+            additions[source.source_id]=source
+            source_pages=[PageRef(uuid4().hex, source.source_id, i, annotations=(
                 source.page_annotations[i] if i < len(source.page_annotations) else ()
-            )) for i in range(source.page_count))
-        self._set([*self.pages, *new_pages])
+            )) for i in range(source.page_count)]
+            new_pages.extend(source_pages);imported.extend(source_to_workspace(source.bookmarks,source_pages))
+        bookmarks=(*self.bookmarks,*imported);validate_bookmarks(bookmarks,{p.uid for p in [*self.pages,*new_pages]})
+        self.sources.update(additions)
+        self._set([*self.pages, *new_pages],bookmarks)
         return [page.uid for page in new_pages]
+
+    def set_bookmarks(self, bookmarks: Sequence[WorkspaceBookmark]) -> None:
+        self._set(self.pages,bookmarks)
+
+    def add_bookmark(self,title,page_uid=None,*,parent_uid=None,index=None) -> str:
+        item=WorkspaceBookmark(uuid4().hex,title,page_uid)
+        self.set_bookmarks(insert_bookmark(self.bookmarks,item,parent_uid=parent_uid,index=index));return item.uid
+
+    def update_bookmark(self,uid,*,title=None,page_uid=Ellipsis) -> None:
+        found=bookmark_location(self.bookmarks,uid)
+        if found is None:raise PdfWorkbenchError("Das Lesezeichen wurde nicht gefunden.")
+        item=found[2];item=replace(item,title=item.title if title is None else title,
+                                 page_uid=item.page_uid if page_uid is Ellipsis else page_uid)
+        self.set_bookmarks(replace_bookmark(self.bookmarks,uid,item))
+
+    def delete_bookmark(self,uid,*,keep_children=False) -> None:
+        self.set_bookmarks(delete_bookmark(self.bookmarks,uid,keep_children=keep_children))
+
+    def move_bookmark(self,uid,*,parent_uid=None,index=None) -> None:
+        self.set_bookmarks(move_bookmark(self.bookmarks,uid,parent_uid=parent_uid,index=index))
+
+    def snapshot(self,include_history=True) -> WorkspaceState:
+        return WorkspaceState(tuple(self.sources.values()),tuple(self.pages),self.bookmarks,
+            tuple(self._undo) if include_history else (),tuple(self._redo) if include_history else (),
+            tuple(self._undo_bookmarks) if include_history else (),tuple(self._redo_bookmarks) if include_history else ())
+
+    def restore_state(self,state: WorkspaceState,*,clear_history=False) -> None:
+        """Validate every snapshot before replacing any part of the live session."""
+        if not isinstance(state,WorkspaceState):raise PdfWorkbenchError("Der Projektzustand ist ungültig.")
+        sources={}
+        for source in state.sources:
+            if (not isinstance(source,SourceDocument) or not isinstance(source.source_id,str) or not source.source_id
+                    or source.source_id in sources or not isinstance(source.data,bytes)
+                    or type(source.page_count) is not int or source.page_count<1
+                    or len(source.page_sizes)!=source.page_count):
+                raise PdfWorkbenchError("Eine Projektquelle ist ungültig oder mehrfach vorhanden.")
+            for size in source.page_sizes:
+                if len(size)!=2 or any(not math.isfinite(n) or n<=0 for n in size):raise PdfWorkbenchError("Ein Projektseitenformat ist ungültig.")
+            validate_source_bookmarks(source.bookmarks,source.page_count)
+            sources[source.source_id]=source
+        def validate(pages,bookmarks):
+            ids=set()
+            for page in pages:
+                if (not isinstance(page,PageRef) or not isinstance(page.uid,str) or not page.uid or page.uid in ids
+                        or page.source_id not in sources or type(page.page_index) is not int
+                        or not 0<=page.page_index<sources[page.source_id].page_count
+                        or type(page.rotation) is not int or page.rotation%90):raise PdfWorkbenchError("Eine Projektseite ist ungültig.")
+                ids.add(page.uid)
+            validate_bookmarks(bookmarks,ids)
+        if (len(state.undo)!=len(state.undo_bookmarks) or len(state.redo)!=len(state.redo_bookmarks)
+                or len(state.undo)>50 or len(state.redo)>50):raise PdfWorkbenchError("Der Projektverlauf ist ungültig.")
+        validate(state.pages,state.bookmarks)
+        for pages,bookmarks in (*zip(state.undo,state.undo_bookmarks),*zip(state.redo,state.redo_bookmarks)):validate(pages,bookmarks)
+        self.sources=sources;self.pages=list(state.pages);self.bookmarks=tuple(state.bookmarks)
+        self._undo=[] if clear_history else list(state.undo);self._redo=[] if clear_history else list(state.redo)
+        self._undo_bookmarks=[] if clear_history else list(state.undo_bookmarks)
+        self._redo_bookmarks=[] if clear_history else list(state.redo_bookmarks)
 
     def replace_source(self, source_id: str, new_source: SourceDocument) -> None:
         """Replace an immutable snapshot while keeping undoable page identity."""
@@ -298,12 +392,16 @@ class Workspace:
     def undo(self) -> None:
         if self._undo:
             self._redo.append(tuple(self.pages))
+            self._redo_bookmarks.append(self.bookmarks)
             self.pages = list(self._undo.pop())
+            self.bookmarks=self._undo_bookmarks.pop()
 
     def redo(self) -> None:
         if self._redo:
             self._undo.append(tuple(self.pages))
+            self._undo_bookmarks.append(self.bookmarks)
             self.pages = list(self._redo.pop())
+            self.bookmarks=self._redo_bookmarks.pop()
 
 
 def _protect_destination(target: Path, sources: Mapping[str, SourceDocument]) -> None:
@@ -332,7 +430,7 @@ def _discard_partial(target: Path, identity: tuple[int, int] | None) -> str:
 
 def _build_writer(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
                   title: str, cancel: CancelCheck | None = None,
-                  progress: Progress | None = None) -> PdfWriter:
+                  progress: Progress | None = None, *, bookmarks=None) -> PdfWriter:
     from .forms import copy_page_fields, page_has_fields
     if not pages:
         raise PdfWorkbenchError("Bitte wähle mindestens eine Seite aus.")
@@ -363,6 +461,7 @@ def _build_writer(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef
         if progress:
             progress(int((index + 1) / len(pages) * 85),
                      f"Seite {index + 1} von {len(pages)} vorbereiten …")
+    write_bookmarks(writer,pages,bookmarks_for_sources(sources,pages) if bookmarks is None else bookmarks,cancel)
     writer.add_metadata({"/Producer": f"PDF Workbench {__version__} (pypdf)", "/Title": title})
     return writer
 
@@ -415,10 +514,10 @@ def _serialize_output(writer: PdfWriter, options: CompressionOptions | None,
 
 def preview_compression(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
                         options: CompressionOptions, cancel: CancelCheck | None = None,
-                        progress: Progress | None = None) -> CompressionReport:
+                        progress: Progress | None = None, *, bookmarks=None) -> CompressionReport:
     """Measure an in-memory export; creates no temporary or destination file."""
     try:
-        writer = _build_writer(sources, pages, "Komprimierungsvorschau", cancel, progress)
+        writer = _build_writer(sources, pages, "Komprimierungsvorschau", cancel, progress,bookmarks=bookmarks)
         _, report = _serialize_output(writer, options, None, cancel, progress)
         assert report is not None
         return report
@@ -438,6 +537,7 @@ def export_pdf(
     password: str | None = None,
     optimization: CompressionOptions | None = None,
     compression_report: Callable[[CompressionReport], None] | None = None,
+    bookmarks: Sequence[WorkspaceBookmark] | None = None,
 ) -> Path:
     """Write selected pages in their current order, safely creating a fresh PDF.
 
@@ -456,7 +556,7 @@ def export_pdf(
     created_target = False
     created_identity = None
     try:
-        writer = _build_writer(sources, pages, target.stem, cancel, progress)
+        writer = _build_writer(sources, pages, target.stem, cancel, progress,bookmarks=bookmarks)
         data, report = _serialize_output(writer, optimization, password, cancel, progress)
         descriptor, name = tempfile.mkstemp(prefix=".pdf-workbench-", suffix=".tmp", dir=target.parent)
         temporary = Path(name)

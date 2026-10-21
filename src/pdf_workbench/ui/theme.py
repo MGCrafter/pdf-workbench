@@ -133,6 +133,12 @@ class ThemeController(QObject):
         app._pdf_workbench_theme = self
         self.settings = settings if settings is not None else QSettings("PDF Workbench", "PDF Workbench")
         self.style_hints = style_hints if style_hints is not None else app.styleHints()
+        # All entry points, including embedded windows, use the same base style.
+        # Native desktop style plugins may retain pointers across a stylesheet
+        # repolish; the application's own light/dark design is built on Fusion.
+        if not getattr(app, "_pdf_workbench_fusion_style", False):
+            app.setStyle("Fusion")
+            app._pdf_workbench_fusion_style = True
         stored = self.settings.value(self.KEY, "system")
         self.preference = stored if stored in ("system", "light", "dark") else "system"
         self.effective_name = None
@@ -165,6 +171,7 @@ class ThemeController(QObject):
         # Keep Python-owned widgets alive throughout the global repolish.
         widgets = self.app.allWidgets()
         self.app.setPalette(make_palette(name))
+        self.app.setStyleSheet("")
         self.app.setStyleSheet(stylesheet(name))
         QPixmapCache.clear()
         for widget in widgets:

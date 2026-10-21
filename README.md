@@ -4,15 +4,15 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-**Version 0.7.0** ergänzt einen Dokumentvergleich, einen visuellen Formulareditor
-sowie Wasserzeichen und Seitennummern.
+**Version 0.8.0** ergänzt Lesezeichen, Zuschneiden und Seitenformate,
+speicherbare Projekte mit automatischer Sicherung sowie einen integrierten Updater.
 
 ## Download
 
-| System | Download für v0.7.0 |
+| System | Download für v0.8.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.7.0/PDFWorkbench-v0.7.0-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.7.0/PDFWorkbench-v0.7.0-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.8.0/PDFWorkbench-v0.8.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.8.0/PDFWorkbench-v0.8.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -23,11 +23,13 @@ macOS ist noch nicht getestet und hat derzeit kein Downloadpaket.
 **Windows:** Das ZIP vollständig entpacken und im entpackten Ordner
 `PDFWorkbench.exe` öffnen. Die mitgelieferten Dateien müssen im selben Ordner
 bleiben.
+Unter Windows darf der Programmordner kein Semikolon (`;`) enthalten;
+Umlaute und Leerzeichen funktionieren.
 
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.7.0-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.8.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
@@ -54,6 +56,11 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Ab 0.7: PDF-Versionen mit Text- und Bildänderungen nebeneinander vergleichen.
 - Interaktive Textfelder, Kontrollkästchen, Dropdowns und Optionsgruppen gestalten.
 - Wasserzeichen und Seitennummern mit Vorschau auf alle oder ausgewählte Seiten setzen.
+- Kapitel als verschachtelte Lesezeichen verwalten, auch nach dem Umsortieren.
+- Sichtbare Seitenränder zuschneiden oder proportional auf A4, Letter und eigene Formate setzen.
+- Den gesamten Arbeitsbereich als `.pdfwb`-Projekt speichern, inklusive eingebetteter
+  PDFs, eigener Objekte, Lesezeichen und Undo-/Redo-Historie; automatische lokale Sicherungen.
+- Neue Programmversionen täglich prüfen und nach Bestätigung herunterladen und installieren.
 
 ## Loslegen
 
@@ -69,8 +76,9 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
    nur die ausgewählten Seiten; **Einzelseiten …** legt einzelne PDFs in einem
    neuen Unterordner an.
 
-**Deine Originale bleiben unverändert.** Die App überschreibt auch keine
-vorhandenen Ausgabedateien. Wähle zum Speichern einen neuen Dateinamen.
+**Deine Originale bleiben unverändert.** PDF-Exporte und neue Projekte brauchen
+einen neuen Dateinamen. Ein geöffnetes Projekt lässt sich mit **Strg+S** aktualisieren;
+zwischenzeitlich extern veränderte Dateien werden dabei geschützt.
 Eigene Anmerkungen bleiben nach dem Speichern und erneuten Öffnen bearbeitbar.
 
 Neue Textfelder und Bilder findest du in der Vorschau unter **Einfügen**.
@@ -100,6 +108,8 @@ Originalfarben.
 | Links / rechts drehen | Strg + `L` / Strg + `R` |
 | Duplizieren / entfernen | Strg + `D` / Entf |
 | Rückgängig | Strg + `Z` |
+| Projekt speichern / öffnen | Strg + `S` / Strg + Alt + `O` |
+| Lesezeichen bearbeiten | Strg + Alt + `B` |
 | Text suchen | Strg + `F`; Eingabe / Umschalt + Eingabe zum nächsten / vorigen Treffer |
 | Eigenes Objekt bearbeiten | Doppelklick, F2 oder Eingabe im Pfeilwerkzeug |
 | Objekt verschieben / abbrechen | Pfeiltasten; Umschalt für größere Schritte / Esc |
@@ -111,7 +121,8 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 
 - PDFs mit Öffnungspasswort lassen sich entsperren und als neue Datei mit
   AES-256 schützen. Normale Exporte, Einzelseiten und OCR bleiben unverschlüsselt.
-  Passwörter werden nicht in Einstellungen oder Dokument-Snapshots gespeichert.
+  Passwörter werden nicht in Einstellungen oder Projektdateien gespeichert. Geschützte
+  Projekte behalten ihr Passwort bis zum Schließen nur im Arbeitsspeicher.
 - Normale AcroForms mit Textfeldern, Kontrollkästchen, Einfachauswahl und
   Optionsgruppen werden unterstützt. XFA, Zertifikatssignaturen, Aktionsschaltflächen,
   Skripte, Berechnungen, Felder mit NoRotate-/NoZoom-Sonderverhalten sowie mehrdeutige
@@ -129,8 +140,11 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 - Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
   sie für Scans ergänzen. Bestehender PDF-Text lässt sich nicht direkt ändern;
   neue Textfelder sind eigene Objekte.
-- Dokumentweite Lesezeichen, Anhänge, Metadaten und Tags werden beim Export
-  nicht übernommen. PDF/A-Konformität ist nicht garantiert.
+- Sichere Lesezeichen auf enthaltene Seiten werden übernommen. Externe Aktionen,
+  Skripte und genaue ursprüngliche Zoompositionen werden nicht kopiert. Anhänge,
+  dokumentweite Metadaten und Tags werden nicht übernommen; PDF/A ist nicht garantiert.
+- Zuschneiden blendet Inhalte aus und ist **keine sichere Schwärzung**. Angeschnittene
+  eigene Objekte können zu normalen PDF-Anmerkungen ohne Workbench-Bearbeitungsgriffe werden.
 - Vorhandene Seitenanmerkungen werden übernommen. Interne Verweise auf entfernte
   oder umsortierte Seiten sind nicht vollständig unterstützt.
 

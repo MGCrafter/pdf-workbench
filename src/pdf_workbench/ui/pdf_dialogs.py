@@ -31,14 +31,15 @@ class CompressionWorker(QThread):
     result = pyqtSignal(object)
     failed = pyqtSignal(str)
 
-    def __init__(self, sources, pages, options, parent):
+    def __init__(self, sources, pages, options, parent, bookmarks=None):
         super().__init__(parent)
         self.sources, self.pages, self.options = sources, pages, options
+        self.bookmarks = bookmarks
         self.cancel_event = threading.Event()
 
     def run(self):
         try:
-            self.result.emit(preview_compression(self.sources, self.pages, self.options, self.cancel_event.is_set))
+            self.result.emit(preview_compression(self.sources, self.pages, self.options, self.cancel_event.is_set, bookmarks=self.bookmarks))
         except OperationCancelled:
             pass
         except Exception as error:
@@ -46,10 +47,11 @@ class CompressionWorker(QThread):
 
 
 class CompressionDialog(QDialog):
-    def __init__(self, parent, sources, pages):
+    def __init__(self, parent, sources, pages, bookmarks=None):
         super().__init__(parent)
         self.setWindowTitle("PDF komprimieren"); self.resize(540, 460)
         self.sources, self.pages, self.worker, self.report = sources, tuple(pages), None, None
+        self.bookmarks = bookmarks
         self._reject_pending = False
         layout = QVBoxLayout(self); layout.setContentsMargins(24,24,24,20); layout.setSpacing(16)
         heading(layout, "Kleiner speichern.", "Verglichen wird dieselbe aktuelle Seitenanordnung – einmal normal und einmal komprimiert. Ihre Originaldateien bleiben erhalten.")
@@ -89,7 +91,7 @@ class CompressionDialog(QDialog):
     def calculate(self):
         if self.worker: return
         semantic_label(self.details, "muted")
-        self.worker = CompressionWorker(self.sources, self.pages, self.options, self)
+        self.worker = CompressionWorker(self.sources, self.pages, self.options, self, self.bookmarks)
         self.worker.result.connect(self._result); self.worker.failed.connect(self._failed); self.worker.finished.connect(self._finished)
         self.preview_button.setEnabled(False); self.quality.setEnabled(False); self.save_button.setEnabled(False)
         self.progress.show(); self.comparison.setText("Dateigrößen werden berechnet …"); self.worker.start()
@@ -127,8 +129,8 @@ class CompressionDialog(QDialog):
         else: super().closeEvent(event)
 
     @classmethod
-    def get_options(cls, parent, sources, pages):
-        dialog = cls(parent, sources, pages)
+    def get_options(cls, parent, sources, pages, bookmarks=None):
+        dialog = cls(parent, sources, pages, bookmarks)
         return dialog.options if dialog.exec() == QDialog.DialogCode.Accepted else None
 
 

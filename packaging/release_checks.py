@@ -1,5 +1,18 @@
 """Named acceptance requirements shared by the native smoke and release gate."""
 
+
+V04_GUI_CHECKS = frozenset((
+    "appearance dark/light/system", "appearance persisted",
+    "appearance preserves document and viewport", "appearance document/export colors",
+    "appearance dialogs and icons",
+))
+
+V05_GUI_CHECKS = frozenset((
+    "objects select/move/duplicate/delete/undo", "objects text/image/stamp/symbol PDF roundtrip",
+    "objects bundled font and Unicode", "asynchronous text search", "images to PDF and undo",
+    "local OCR searchable text and preserved image",
+))
+
 V06_CORE_CHECKS = frozenset((
     "test_aes256_and_image_compression_runtime",
     "test_acroform_fill_export_reopen_runtime",
@@ -23,4 +36,21 @@ V07_GUI_CHECKS = frozenset((
     "PDF comparison text/visual alignment and read-only navigation",
     "AcroForm design create/edit/delete/radio and undo",
     "page marks preview/export/reopen/selection and undo",
+))
+
+
+V08_CORE_CHECKS = frozenset((
+    "test_bookmarks_reorder_subset_runtime",
+    "test_page_geometry_crop_resize_runtime",
+    "test_project_history_encryption_runtime",
+    "test_recovery_generations_runtime",
+    "test_update_metadata_integrity_runtime",
+))
+
+V08_GUI_CHECKS = frozenset((
+    "bookmarks edit/export/page targets and undo",
+    "page geometry real preview/crop/resize/selection and undo",
+    "project save/open/history/view and original independence",
+    "autosave/recovery/encrypted snapshot and safe close",
+    "updater fixture check/cancel/preferences without installation",
 ))

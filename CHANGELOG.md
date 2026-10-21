@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.8.0
+
+- Verschachtelte Lesezeichen importieren, gestalten und mit stabilen Arbeitsseitenzielen
+  exportieren; umsortieren, kopieren und entfernen mit gemeinsamem Undo.
+- Seiten mit echter Vorschau und ziehbarem Rahmen zuschneiden oder proportional
+  auf A4, Letter und eigene Formate setzen; Millimeterwerte und Tastaturbedienung.
+- `.pdfwb`-Projekte mit eingebetteten Originaldaten, editierbaren Objekten,
+  Lesezeichen, Auswahl, Zoom und vollständiger Undo-/Redo-Historie.
+- Automatische lokale Sicherungen mit zwei Generationen und Wiederherstellungsdialog.
+  Entsperrte PDF-Quellen verlangen ein geschütztes Projekt und geschützte Sicherungen.
+- Integrierter Updater für portable Windows-/Linux-Pakete: tägliche Versionsprüfung,
+  expliziter Download/Neustart, SHA-256- und Dateinachweise, Sicherung und Rücknahme
+  bei fehlgeschlagenem Programmstart. Erste Einrichtung durch manuelles Entpacken von 0.8.
+
 ## 0.7.0
 
 - Zwei PDF-Versionen lokal vergleichen: Textänderungen, sichtbare Unterschiede,

@@ -18,6 +18,7 @@ from pypdf.generic import ArrayObject, DecodedStreamObject, DictionaryObject, Fl
 
 from .annotations import add_pdf_annotations, visible_page_box
 from .core import PageRef, PdfWorkbenchError, SourceDocument, _check_cancel
+from .bookmarks import remap_source_bookmarks
 from .forms import copy_page_fields, page_has_fields
 from .text_appearance import TextStyle, font_metrics, normalize_text, pdf_text
 
@@ -210,13 +211,14 @@ def prepare_page_marks(sources: Mapping[str, SourceDocument], pages: Sequence[Pa
     affected_sources = {page.source_id for _, page in targets}
     workset = tuple((index, page) for index, page in enumerate(pages)
                     if page.source_id in affected_sources and (preview_uid is None or page.uid == preview_uid))
-    states, changed, replacements = {}, [], {}
+    states, changed, replacements, source_indexes = {}, [], {}, {}
     for work_index, (index, page) in enumerate(workset):
         _check_cancel(cancel)
         is_target = page.uid in target_indices
         if page.source_id not in sources:
             raise PdfWorkbenchError("Die ursprüngliche PDF-Quelle wurde nicht gefunden.")
         source = sources[page.source_id]
+        source_indexes.setdefault(source.source_id, []).append(page.page_index)
         if source.source_id not in states:
             reader, writer = PdfReader(io.BytesIO(source.data)), PdfWriter()
             writer.pdf_header = "%PDF-1.4"  # Constant-alpha transparency needs PDF 1.4.
@@ -252,8 +254,9 @@ def prepare_page_marks(sources: Mapping[str, SourceDocument], pages: Sequence[Pa
         stream = io.BytesIO(); writer.write(stream)
         data = stream.getvalue()
         sizes = tuple((float(page.mediabox.width), float(page.mediabox.height)) for page in writer.pages)
-        result_sources.append(SourceDocument(source_id, source.path, data, len(sizes), sizes,
-                                             was_encrypted=source.was_encrypted, original_size=source.original_size))
+        result_sources.append(replace(source, source_id=source_id, data=data,
+                                      page_count=len(sizes), page_sizes=sizes, page_annotations=(),
+                                      bookmarks=remap_source_bookmarks(source.bookmarks, source_indexes[source.source_id])))
     _check_cancel(cancel)
     return PageMarksResult(tuple(result_sources), tuple(replacements.get(page.uid, page) for page in pages), tuple(changed))
 

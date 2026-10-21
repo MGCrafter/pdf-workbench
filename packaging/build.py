@@ -4,12 +4,44 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def materialize_bundle_links(bundle: Path) -> None:
+    """Turn PyInstaller's internal library aliases into ordinary bundle files.
+
+    Distribution archives deliberately contain no links. Resolve and validate
+    every alias before changing any, keeping external and directory links errors.
+    """
+    if (bundle.is_symlink() or (hasattr(bundle, 'is_junction') and bundle.is_junction())
+            or not bundle.is_dir()):
+        raise ValueError('Bundle root must be an ordinary directory.')
+    root = bundle.resolve()
+    links = []
+    for path in root.rglob('*'):
+        if path.is_symlink():
+            target = path.resolve(strict=True)
+            if not target.is_relative_to(root) or not target.is_file():
+                raise ValueError(f'Bundle alias is not an internal regular file: {path.relative_to(root)}')
+            links.append((path, target, path.lstat()))
+    for path, target, original in links:
+        descriptor, name = tempfile.mkstemp(prefix='.bundle-alias-', dir=path.parent)
+        temporary = Path(name); os.close(descriptor)
+        try:
+            shutil.copy2(target, temporary)
+            if path.lstat() != original or not path.is_symlink():
+                raise ValueError('Bundle alias changed while preparing the archive.')
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def build_provenance(release: bool) -> dict:
@@ -94,6 +126,9 @@ def main():
         '--add-data', f'{ROOT / "src/pdf_workbench/fonts"}:pdf_workbench/fonts',
         *notice_data, str(ROOT / 'packaging/entry.py'),
     ], cwd=ROOT, check=True)
+    materialize_bundle_links(distpath / 'PDFWorkbench')
+    from pdf_workbench.update_installer import write_bundle_manifest
+    write_bundle_manifest(distpath / 'PDFWorkbench')
     print(f'Build: {distpath / "PDFWorkbench"}')
 
 

@@ -629,7 +629,7 @@ def _layer_transform(page, layer):
 def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
                           destination, *, engine: OcrEngine | None = None,
                           languages=("deu", "eng"), cache_dir=None, dpi=300, timeout=120,
-                          cancel: CancelCheck | None = None, progress: Progress | None = None) -> OcrResult:
+                          cancel: CancelCheck | None = None, progress: Progress | None = None, bookmarks=None) -> OcrResult:
     target = Path(destination).expanduser().absolute()
     _protect_destination(target, sources); _check_cancel(cancel)
     if not pages or target.suffix.lower() != ".pdf":
@@ -651,7 +651,7 @@ def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence
     processed = skipped = 0
     with tempfile.TemporaryDirectory(prefix=".pdf-workbench-ocr-", dir=target.parent) as temporary:
         directory = Path(temporary)
-        base = export_pdf(sources, pages, directory / "original-pages.pdf", cancel)
+        base = export_pdf(sources, pages, directory / "original-pages.pdf", cancel, bookmarks=bookmarks)
         reader = PdfReader(base); writer = PdfWriter(); writer.clone_document_from_reader(reader)
         document = QPdfDocument(None)
         try:
@@ -686,8 +686,14 @@ def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence
                 processed += 1
             _check_cancel(cancel)
             stream = io.BytesIO(); writer.write(stream); data = stream.getvalue()
+            # The first export has already applied the workspace's edited
+            # outline and output page order. Carry that exact safe outline
+            # through the final export, including an explicitly empty tree.
+            from .bookmarks import read_source_bookmarks
+            staged_bookmarks, staged_warnings = read_source_bookmarks(reader, cancel)
             staged = SourceDocument("ocr-result", directory/"merged.pdf", data, len(pages),
-                                    tuple((float(page.mediabox.width), float(page.mediabox.height)) for page in writer.pages))
+                                    tuple((float(page.mediabox.width), float(page.mediabox.height)) for page in writer.pages),
+                                    bookmarks=staged_bookmarks, bookmark_warnings=staged_warnings)
             final_pages = tuple(PageRef(f"ocr-{index}", staged.source_id, index) for index in range(len(pages)))
             result = export_pdf({**sources, staged.source_id: staged}, final_pages, target, cancel,
                                 lambda value, message: progress(85+value*15//100, message) if progress else None)

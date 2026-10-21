@@ -277,6 +277,54 @@ def prepare_assets(
             if not isinstance(data, dict) or data.get("source_commit") != source_commit or data.get("app_version") != tag[1:]:
                 raise ValueError("Build information does not belong to this app tag and commit")
 
+    # Recovery publishing reuses already built native archives. For 0.8 onward,
+    # require the complete feature report and its exact builder linkage here as
+    # well, before uploading any archive. This never executes downloaded code.
+    if tuple(map(int, tag[1:].split('.')[:2])) >= (0, 8):
+        from release_checks import (V04_GUI_CHECKS, V05_GUI_CHECKS, V06_CORE_CHECKS, V06_GUI_CHECKS,
+            V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS)
+        required_core = V06_CORE_CHECKS | V07_CORE_CHECKS | V08_CORE_CHECKS
+        required_gui = V04_GUI_CHECKS | V05_GUI_CHECKS | V06_GUI_CHECKS | V07_GUI_CHECKS | V08_GUI_CHECKS
+        shared_source_hashes = None
+        for platform_name in ('linux', 'windows'):
+            info_path = paths.get(f'PDFWorkbench-{tag}-{platform_name}-BUILD-INFO.json')
+            report_path = paths.get(f'PDFWorkbench-{tag}-{platform_name}-acceptance.json')
+            if info_path is None or report_path is None:
+                raise ValueError('Both native 0.8 build and acceptance reports are required')
+            info, report = _load_json(info_path), _load_json(report_path)
+            if not isinstance(info, dict) or not isinstance(report, dict):
+                raise ValueError('Malformed native 0.8 build or acceptance report')
+            core, gui = report.get('core', {}), report.get('gui', {})
+            accepted = info.get('acceptance', {})
+            provenance = report.get('provenance', {})
+            if (not all(isinstance(item, dict) for item in (core, gui, accepted, provenance))
+                    or not isinstance(core.get('checks'), list) or not all(isinstance(v, str) for v in core['checks'])
+                    or not isinstance(gui.get('checks'), list) or not all(isinstance(v, str) for v in gui['checks'])):
+                raise ValueError('Malformed native 0.8 acceptance fields')
+            native_platforms = {'windows'} if platform_name == 'windows' else {'xcb', 'wayland'}
+            if (report.get('result') != 'PASS' or report.get('frozen') is not True
+                    or report.get('app_version') != tag[1:] or gui.get('app_version') != tag[1:]
+                    or gui.get('result') != 'PASS' or gui.get('qt_platform') not in native_platforms
+                    or type(core.get('tests')) is not int or core['tests'] < 23
+                    or core.get('failures') != 0 or core.get('errors') != 0 or core.get('skipped') != []
+                    or not required_core <= set(core.get('checks', []))
+                    or not required_gui <= set(gui.get('checks', []))
+                    or accepted.get('core') != core or accepted.get('gui_checks') != gui.get('checks')
+                    or accepted.get('qt_platform') != gui.get('qt_platform')
+                    or provenance.get('source_commit') != source_commit
+                    or provenance.get('app_version') != tag[1:]
+                    or provenance.get('source_sha256') != info.get('source_sha256')
+                    or not isinstance(info.get('source_sha256'), dict) or not info['source_sha256']
+                    or any(not isinstance(path, str) or not path or not isinstance(digest, str) or not _HASH.fullmatch(digest)
+                           for path, digest in info['source_sha256'].items())
+                    or not _HASH.fullmatch(str(info.get('executable_sha256', '')))
+                    or report.get('executable_sha256') != info.get('executable_sha256')):
+                raise ValueError('Complete native 0.8 acceptance must match its builder and source commit')
+            if shared_source_hashes is None:
+                shared_source_hashes = info['source_sha256']
+            elif shared_source_hashes != info['source_sha256']:
+                raise ValueError('Both native 0.8 builders must use identical source hashes')
+
     members = [records[name] for name in sorted(paths) if name not in native_names]
     # Avoid creating even a partial huge output when its minimum size cannot fit.
     minimum_size = sum(512 + ((item["size"] + 511) // 512) * 512 for item in members) + 1024
