@@ -656,6 +656,8 @@ def gui_acceptance(directory: Path):
         feature_checks, ocr_info = feature_acceptance(window, directory, app, wait_for)
         from upgrade_smoke import upgrade_acceptance
         feature_checks += upgrade_acceptance(window, directory, app, wait_for, fixture)
+        from v07_smoke import v07_acceptance
+        feature_checks += v07_acceptance(window, directory, app, wait_for, fixture)
         preview.fit_page(); app.processEvents()
         wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
@@ -691,10 +693,12 @@ def main():
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     with (run / "test.log").open("w", encoding="utf-8") as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
         try:
-            PdfAcceptance.base = run
-            result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(PdfAcceptance))
+            from v07_smoke import acceptance_class
+            acceptance = acceptance_class(PdfAcceptance, fixture)
+            acceptance.base = run
+            result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(acceptance))
             report["core"] = {"tests": result.testsRun, "failures": len(result.failures), "errors": len(result.errors), "skipped": [(str(test), reason) for test, reason in result.skipped],
-                              "checks": unittest.defaultTestLoader.getTestCaseNames(PdfAcceptance)}
+                              "checks": unittest.defaultTestLoader.getTestCaseNames(acceptance)}
             if not result.wasSuccessful(): raise AssertionError("PDF acceptance tests failed; see test.log")
             report["gui"] = gui_acceptance(run)
             report["result"] = "PASS"

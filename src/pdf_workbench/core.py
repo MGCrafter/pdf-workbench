@@ -188,6 +188,30 @@ class Workspace:
         self._set([replace(page, source_id=new_source.source_id)
                    if page.source_id == source_id else page for page in self.pages])
 
+    def apply_page_replacements(self, new_sources: Sequence[SourceDocument], pages: Sequence[PageRef]) -> None:
+        """Commit immutable per-page edits atomically, with one undo step."""
+        pages = tuple(pages)
+        if (any(not isinstance(page, PageRef) for page in pages)
+                or tuple(page.uid for page in pages) != tuple(page.uid for page in self.pages)):
+            raise PdfWorkbenchError("Die bearbeiteten Seiten müssen ihre Kennungen und Reihenfolge behalten.")
+        additions = {}
+        for source in new_sources:
+            if not isinstance(source, SourceDocument):
+                raise PdfWorkbenchError("Eine bearbeitete PDF-Quelle ist ungültig.")
+            previous = additions.get(source.source_id, self.sources.get(source.source_id))
+            if previous is not None and previous != source:
+                raise PdfWorkbenchError("Eine vorhandene PDF-Quelle darf nicht verändert werden.")
+            additions[source.source_id] = source
+        candidates = self.sources | additions
+        for page in pages:
+            source = candidates.get(page.source_id)
+            if (source is None or type(page.page_index) is not int
+                    or not 0 <= page.page_index < source.page_count
+                    or type(page.rotation) is not int or page.rotation % 90):
+                raise PdfWorkbenchError("Eine bearbeitete Seite verweist auf eine ungültige PDF-Quelle.")
+        self.sources.update(additions)
+        self._set(pages)
+
     def reorder(self, ordered_ids: Sequence[str]) -> None:
         if len(ordered_ids) != len(self.pages) or set(ordered_ids) != {p.uid for p in self.pages}:
             raise PdfWorkbenchError("Die Seitenreihenfolge ist ungültig.")

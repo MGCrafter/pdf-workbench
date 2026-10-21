@@ -8,6 +8,8 @@ from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, QObject, QPointF, QSize
 from PyQt6.QtGui import QImage, QTransform
 from PyQt6.QtPdf import QPdfDocument, QPdfDocumentRenderOptions
 
+from ..form_rendering import form_render_data
+
 
 class PdfRenderWorker(QObject):
     result = pyqtSignal(object)
@@ -23,7 +25,9 @@ class PdfRenderWorker(QObject):
         if source.source_id not in self.documents:
             document = QPdfDocument(self)
             buffer = QBuffer(self)
-            buffer.setData(QByteArray(source.data))
+            # QtPdf does not paint AcroForm widgets. Only this in-memory
+            # rendering copy embeds their appearances; exports stay interactive.
+            buffer.setData(QByteArray(form_render_data(source)))
             buffer.open(QIODevice.OpenModeFlag.ReadOnly)
             document.load(buffer)
             self.documents[source.source_id] = (document, buffer)

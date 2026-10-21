@@ -210,8 +210,8 @@ class FormSupportTests(unittest.TestCase):
         with self.assertRaises(PdfWorkbenchError):
             fill_source_form(load_source(locked), {"name": "Changed"})
 
-    def test_xfa_signatures_scripts_and_radio_rejected(self):
-        for key in ("xfa", "signature", "script", "radio"):
+    def test_xfa_signatures_scripts_and_pushbuttons_rejected(self):
+        for key in ("xfa", "signature", "script", "pushbutton"):
             writer = PdfWriter(clone_from=io.BytesIO(self.source.data))
             form = writer._root_object["/AcroForm"]
             field = writer.pages[0]["/Annots"][0].get_object()
@@ -219,9 +219,9 @@ class FormSupportTests(unittest.TestCase):
                 form[NameObject("/XFA")] = TextStringObject("dynamic")
             elif key == "signature":
                 field[NameObject("/FT")] = NameObject("/Sig")
-            elif key == "radio":
+            elif key == "pushbutton":
                 field[NameObject("/FT")] = NameObject("/Btn")
-                field[NameObject("/Ff")] = NumberObject(1 << 15)
+                field[NameObject("/Ff")] = NumberObject(1 << 16)
             else:
                 field[NameObject("/AA")] = DictionaryObject({NameObject("/K"): DictionaryObject({NameObject("/S"): NameObject("/JavaScript")})})
             destination = self.directory / (key + ".pdf")

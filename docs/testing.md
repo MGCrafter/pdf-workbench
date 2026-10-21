@@ -1,6 +1,6 @@
 # Tests
 
-Der Entwicklungsstand 0.6 ergänzt Tests für echte AES-256-Dateien,
+Version 0.6 ergänzt Tests für echte AES-256-Dateien,
 Passwortwiederholung und Abbruch, Bildkomprimierung samt transparenten Bildern,
 AcroForm-Werte und sichtbare Felddarstellungen. Sie prüfen auch wiederholtes
 Ausfüllen nach Merge, Duplikat, Seitendrehung und Export sowie den Ausschluss
@@ -8,7 +8,17 @@ nicht exportierter Formularseiten und ihrer Daten. Poppler und Qt vergleichen
 die Darstellung unabhängig von pypdf. Die neue GUI-Abnahme prüft die Dialoge,
 800×560-Pixel-Fenster in beiden Themes und abschaltbare Animationen.
 
-Die konkreten lokalen Ergebnisse stehen im [Windows-Testbericht](windows-v06-testing.md).
+Der lokale Schlussstand 0.7 (`be75a71`, 21.10.2026) besteht auf Linux
+373 Tests ohne Fehler oder Skips. Die gebaute App besteht zusätzlich 18
+PDF-Kerntests und die native Wayland-GUI-Abnahme. Das ist ein lokaler
+Entwicklungsbuild auf glibc 2.44; die veröffentlichten Linux-Pakete werden
+separat auf Ubuntu 22.04 gebaut und getestet.
+
+Unter Windows 11 bestehen 367 gemeldete Tests mit 14 ausdrücklich ausgewiesenen
+Skips sowie der Quell- und EXE-Selbsttest mit je 18 PDF-Prüfungen und nativer
+GUI-Abnahme. Details und Prüfgrenzen stehen im
+[Windows-Testbericht für 0.7](windows-v07-testing.md). Der historische
+[Bericht für 0.6](windows-v06-testing.md) bleibt erhalten.
 Die vollständige lokale Reviewchronik wird in `docs/review.md` geführt und nicht
 veröffentlicht. Die lokalen Nachweise beschreiben Entwicklungsbuilds. Für die
 veröffentlichten Pakete prüft der jeweilige Release-Lauf zusätzlich die fertig
@@ -44,6 +54,27 @@ Ordner. Ein fehlgeschlagener Test verhindert die Veröffentlichung.
 Die [GitHub-Actions-Läufe](https://github.com/MGCrafter/pdf-workbench/actions)
 zeigen den Stand für jeden Commit und jedes Release. macOS gehört noch nicht
 zur Testmatrix; ein Windows- oder Linux-Ergebnis ist kein macOS-Nachweis.
+
+## Neue Funktionen in 0.7
+
+Die Vergleichstests prüfen eingefügte und verschobene Seiten, Text- und reine
+Bildänderungen, eigene Anmerkungen, Grenzwerte, Abbruch und unveränderte Originale.
+GUI-Tests prüfen gemeinsame Navigation, Zoom, Scrollen und das Beenden der Worker.
+
+Formulartests erstellen echte Text-, Checkbox-, Dropdown- und Radiofelder,
+bearbeiten Eigenschaften und Geometrie und öffnen exportierte Dateien erneut.
+Gezielte Fälle prüfen verschachtelte Felder, gelöschte Werte, Radio-Exportwerte,
+Auswahlexporte und das Weglassen nicht exportierter Formularseiten.
+Seitenmarkierungen werden bei allen 16 Kombinationen aus Quelldrehung und
+Arbeitsdrehung mit versetztem Beschnitt durch Qt und Poppler gerendert.
+Weitere Fälle prüfen Unicode, transparente Wasserzeichen, Vorlagen, getrennte
+Seitenkopien, Originalschutz und einen gemeinsamen Undo-/Redo-Schritt.
+
+Ab 0.7 sind im fertigen Programm mindestens 18 PDF-Kerntests ohne Skips sowie
+drei benannte GUI-Nachweise für Vergleich, Formulargestaltung und Seitenmarkierungen
+zusätzlich zu den bisherigen Release-Prüfungen erforderlich. Die Existenz dieser
+Prüfungen ist noch kein bestandener Plattformnachweis; Ergebnisse werden erst
+nach einem tatsächlichen Lauf dokumentiert.
 
 ## Neue Werkzeuge und OCR
 

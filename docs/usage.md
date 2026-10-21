@@ -137,7 +137,7 @@ unverschlüsselte Dateien; der Passwortschutz einer Quelle wird nicht automatisc
 
 Eine Seite der gewünschten Quelldatei aktivieren und **Werkzeuge → Formular
 ausfüllen …** wählen. Der Dialog zeigt alle unterstützten Felder dieser Quelle:
-normale Textfelder, Kontrollkästchen und Einfachauswahl. Die Änderung gilt auch
+normale Textfelder, Kontrollkästchen, Einfachauswahl und Optionsgruppen. Die Änderung gilt auch
 für ihre duplizierten Arbeitsseiten und lässt sich gemeinsam rückgängig machen.
 Erst **PDF speichern …** schreibt sie in eine neue Datei. Unterstützte Felder
 bleiben nach Export und Wiederöffnen ausfüllbar; bei zusammengefügten Formularen
@@ -150,11 +150,84 @@ Dekorrahmen oder spezielle Schrifteffekte können vereinfacht werden.
 
 Schreibgeschützte Felder und Längenbegrenzungen werden berücksichtigt. Wenn die
 PDF-Schrift ein eingegebenes Zeichen nicht darstellen kann, lehnt die App die
-Änderung ab. XFA, Signaturfelder, Skripte und Berechnungen, Optionsschalter,
+Änderung ab. XFA, Signaturfelder, Skripte und Berechnungen,
 Aktionsschaltflächen, Passwort- und Richtextfelder, editierbare Auswahl und
-Mehrfachauswahl sowie mehrdeutige oder nicht seitengebundene Felder gehören noch
-nicht zum unterstützten Umfang. Das Erstellen neuer interaktiver Felder ist
-ebenfalls noch nicht verfügbar.
+Mehrfachauswahl sowie mehrdeutige oder nicht seitengebundene Felder gehören
+nicht zum unterstützten Umfang. Felder mit dem speziellen NoRotate- oder NoZoom-Verhalten
+werden mit einer Erklärung abgewiesen, damit Vorschau und Export nicht
+unterschiedlich ausgerichtet oder skaliert erscheinen.
+
+## Interaktive Formulare gestalten
+
+**Werkzeuge → Formularfelder bearbeiten …** (Strg + Alt + F) öffnet die
+Quelldatei der aktuellen Seite im visuellen Editor. Ein Feldtyp und **Feld
+hinzufügen** legen ein Textfeld, Kontrollkästchen, Dropdown oder eine Optionsgruppe
+an. Felder lassen sich in der Vorschau auswählen, verschieben und über den
+Eckgriff vergrößern. Pfeiltasten verschieben das ausgewählte Feld, Umschalt
+vergrößert den Schritt. Position, Größe und Seite sind auch rechts einstellbar.
+
+Feldname, Beschriftung, Anfangswert, Schreibschutz und Pflichtkennzeichnung
+stehen in den Eigenschaften. **Eigenschaften übernehmen** prüft die Eingaben.
+Bei Dropdowns bedeutet eine Zeile `wert=Beschriftung` eine Auswahloption;
+der Anfangswert ist der Teil links vom Gleichheitszeichen. Eine Optionsgruppe
+speichert genau eine gewählte Option. Über die Platzierungsauswahl lassen sich
+ihre Schaltflächen einzeln positionieren. **Nach oben / Nach unten** ändern
+die Feldreihenfolge für die Tabulatortaste.
+
+**Formular übernehmen** überträgt alle Änderungen als einen Undo-Schritt.
+Sie gelten für die ganze Quelldatei, auch für duplizierte Arbeitsseiten dieser
+Quelle. **PDF speichern …** schreibt eine neue, weiterhin ausfüllbare PDF.
+Beim Export einer Seitenauswahl werden ausgelassene Widgets und ihre Werte
+nicht mitgenommen. Liegt die ausgewählte Radiooption nur auf einer ausgelassenen
+Seite, wird die exportierte Gruppe geleert.
+
+Neue und geänderte Feldansichten verwenden eine schlichte Standardschrift mit
+Windows-1252-Zeichen. Nicht darstellbare Zeichen werden abgewiesen. Aufwendige
+ursprüngliche Gestaltung kann sich beim Bearbeiten vereinfachen. Ein Pflichtfeld
+wird als solches gekennzeichnet; die App prüft vor dem Export keine Vollständigkeit.
+Das Löschen eines Felds ist keine allgemeine Schwärzungsfunktion für Dokumentinhalte.
+
+## PDF-Versionen vergleichen
+
+**Werkzeuge → PDF-Versionen vergleichen …** öffnet zwei PDFs unabhängig vom
+Arbeitsbereich. Geschützte Dateien fragen nach ihrem Öffnungspasswort. Links
+steht die erste, rechts die zweite Version. Der Vergleich ordnet gleiche Seiten
+zu, sodass eine eingefügte Seite nachfolgende Seiten nicht pauschal als geändert
+markiert. Verschobene Seiten erscheinen mit einem Verweis auf ihre Gegenstelle.
+
+Die Änderungsliste zeigt eingefügte, entfernte und geänderte Seiten. Textänderungen
+zeigen Vorher und Nachher; farbige Rahmen kennzeichnen sichtbare Unterschiede.
+Ein Klick springt zur passenden Seite. Zoom und Scrollposition beider Vorschauen
+laufen gemeinsam. **Nur Änderungen** blendet unveränderte Seiten aus. Abbrechen
+oder Schließen verändert weder Arbeitsbereich noch Dateien.
+
+Der Vergleich wertet auslesbaren Text und gerenderte Seiten mit bis zu
+1.000 Pixeln an der längsten Kante aus. Er ist auf 300 Seiten je Datei begrenzt;
+Seiten mit mehr als 100.000 ausgelesenen Textzeichen werden abgewiesen.
+Pro Seite zeigt die Liste höchstens 60 Textänderungen; eine Kürzung wird angezeigt. Sehr kleine Bildänderungen können
+unentdeckt bleiben. Scans werden visuell verglichen und bekommen dabei keine
+OCR. Metadaten, versteckte Anhänge, Tags, Berechtigungen und die Echtheit digitaler
+Signaturen sind nicht Teil des Vergleichs. Ein unverändertes Ergebnis bestätigt
+keine Bytegleichheit oder vollständige inhaltliche Gleichheit.
+
+## Wasserzeichen und Seitennummern
+
+**Werkzeuge → Wasserzeichen …** setzt eigenen Text mit Farbe, Schriftgröße,
+Position, Rand, Winkel und Deckkraft. **Werkzeuge → Seitennummern …** ergänzt
+Nummern mit einer Vorlage wie `Seite {page} von {pages}`. Die Startnummer und
+die Zählweise lassen sich ändern: durch das ganze Arbeitsdokument oder nur
+durch die bearbeiteten Seiten.
+
+Als Ziel stehen alle Seiten, die aktuelle Auswahl oder ein Bereich wie
+`1-3, 5` bereit. Die Seitenzahlen beziehen sich auf die Arbeitsreihenfolge.
+Die Vorschau zeigt die tatsächliche PDF-Darstellung mit der aktuellen Drehung.
+Nach einer Eingabe wird erst nach erneuter Vorschau **Übernehmen** freigegeben.
+Eine duplizierte Seite wird unabhängig von ihrer anderen Kopie bearbeitet.
+
+Die Übernahme ist ein Undo-Schritt; gespeichert wird erst mit **PDF speichern …**.
+Der Text wird normaler PDF-Seiteninhalt. Nach dem Wiederöffnen lässt er sich
+nicht als eigenes Workbench-Objekt auswählen. Er schützt nicht vor Kopieren,
+Entfernen oder Veränderungen und ersetzt keine vertrauliche Kennzeichnungskontrolle.
 
 ## Textfelder, Bilder und Stempel
 
