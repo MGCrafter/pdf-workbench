@@ -249,4 +249,6 @@ class PageMarksDialog(QDialog):
     @classmethod
     def get_request(cls,parent,workspace,selected_ids=(),*,mode="watermark"):
         dialog = cls(parent,workspace,selected_ids,mode=mode)
-        return dialog._ready_request if dialog.exec() == QDialog.DialogCode.Accepted else None
+        result = dialog._ready_request if dialog.exec() == QDialog.DialogCode.Accepted else None
+        dialog.deleteLater()
+        return result

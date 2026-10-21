@@ -938,7 +938,9 @@ class MainWindow(QMainWindow):
             self._load_comparison_sources(paths, loaded)
             return
         from .ui.compare_dialog import ComparisonDialog
-        ComparisonDialog(loaded[0], loaded[1], self, motion=self.motion).exec()
+        dialog = ComparisonDialog(loaded[0], loaded[1], self, motion=self.motion)
+        dialog.exec()
+        dialog.deleteLater()
 
     def edit_form_fields(self):
         if self.job or self.preview.selection_pending or self._active_uid not in self._page_by_uid:

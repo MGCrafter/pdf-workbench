@@ -42,7 +42,7 @@ class ComparisonOpenTests(unittest.TestCase):
         self.window = MainWindow()
         self.errors = []
         self.window.show_error = lambda *args: self.errors.append(args)
-        self.dialog = Mock(return_value=SimpleNamespace(exec=lambda: 0))
+        self.dialog = Mock(return_value=SimpleNamespace(exec=lambda: 0, deleteLater=Mock()))
         self.module = patch.dict(sys.modules, {'pdf_workbench.ui.compare_dialog': SimpleNamespace(ComparisonDialog=self.dialog)})
         self.module.start()
 

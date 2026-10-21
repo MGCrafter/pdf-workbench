@@ -368,4 +368,6 @@ class FormEditorDialog(QDialog):
     @classmethod
     def get_source(cls,parent,source,*,page_index=0,workspace_rotation=0):
         dialog=cls(source,parent,page_index=page_index,workspace_rotation=workspace_rotation)
-        return dialog.result_source if dialog.exec()==QDialog.DialogCode.Accepted else None
+        result = dialog.result_source if dialog.exec()==QDialog.DialogCode.Accepted else None
+        dialog.deleteLater()
+        return result
