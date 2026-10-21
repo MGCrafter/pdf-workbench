@@ -10,8 +10,9 @@ die Darstellung unabhängig von pypdf. Die neue GUI-Abnahme prüft die Dialoge,
 
 Die konkreten lokalen Ergebnisse stehen im [Windows-Testbericht](windows-v06-testing.md).
 Die vollständige lokale Reviewchronik wird in `docs/review.md` geführt und nicht
-veröffentlicht. Die neuen Nachweise beschreiben Entwicklungsbuilds; die
-veröffentlichten Pakete bleiben bei 0.5.3.
+veröffentlicht. Die lokalen Nachweise beschreiben Entwicklungsbuilds. Für die
+veröffentlichten Pakete prüft der jeweilige Release-Lauf zusätzlich die fertig
+gebauten Windows- und Linux-Programme und archiviert ihre Berichte.
 
 Die Tests erzeugen ihre PDFs selbst. Sie prüfen vor allem Dinge, bei denen ein
 Fehler Dokumente beschädigen oder Änderungen verlieren könnte: Originalschutz,
@@ -57,6 +58,9 @@ Die Release-Abnahme verlangt ab 0.4 die fünf benannten Theme-Prüfungen und ab
 0.5 zusätzlich Objekte, eingebettete Schrift, Suche, Bildimport und echten
 OCR-Export. Berichte müssen zur tatsächlichen ausführbaren Datei, Version und
 zum Quellstand einschließlich Schrift- und Lizenzdaten passen.
+Ab 0.6 sind außerdem 15 PDF-Kerntests und benannte Nachweise für AES-256,
+Komprimierung, Formularbearbeitung mit Undo, Passwortwiederholung und Abbruch
+sowie reduzierte Bewegung in beiden kompakten Themes erforderlich.
 
 Für die optionalen echten OCR-Tests muss Tesseract mit Englisch und `pdf.ttf`
 installiert sein. Ohne diese Voraussetzungen werden sie ausdrücklich

@@ -34,6 +34,12 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 QT_VERSION = "6.11.2"
 LOCK = ROOT / "packaging/notices-lock.json"
+# This verbatim GNU original is small, immutable release input. Keep its
+# canonical provenance and digest in the same reviewed lock as the Qt notices,
+# so a flaky license-document host cannot interrupt an otherwise complete build.
+RUNTIME_LOCKED_NOTICES = {
+    "https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt": "licenses/upstream/runtime/LGPL-2.1.txt",
+}
 # This release does not include WebEngine, Multimedia, Bluetooth or Qt3D.
 # New native Qt modules require an attribution/source audit before this list grows.
 COVERED_QT_MODULES = frozenset("Core Gui Widgets Network DBus Pdf PdfWidgets Svg SvgWidgets OpenGL OpenGLWidgets PrintSupport Sql Xml Concurrent Qml QmlMeta QmlModels QmlWorkerScript QmlBuiltins Quick QuickControls2 QuickTemplates2 QuickWidgets ShaderTools VirtualKeyboard WaylandClient WaylandCompositor WaylandEglClientHwIntegration WaylandEglCompositorHwIntegration InputSupport XcbQpa EglFSDeviceIntegration".split())
@@ -208,6 +214,7 @@ def copy_locked_notices(output: Path) -> dict:
         "agg23/copying.txt", "bigint/LICENSE.txt", "lcms/LICENSE.txt",
         "libopenjpeg/LICENSE.txt", "libtiff/LICENSE.md.txt",
         "dragonbox/LICENSE-Apache2-LLVM.txt", "dragonbox/LICENSE-Boost.txt")}
+    critical |= set(RUNTIME_LOCKED_NOTICES.values())
     if not critical <= paths:
         raise IncompleteNotices(f"Critical Qt/PDFium notices missing from lock: {sorted(critical-paths)}")
     for item in lock["files"]:
@@ -220,6 +227,21 @@ def copy_locked_notices(output: Path) -> dict:
         raise IncompleteNotices("Missing PDFium/Foxit font copyright")
     put(output, "upstream-lock.json", LOCK.read_bytes())
     return lock
+
+
+def fetch_runtime_notice(url: str, output: Path, lock: dict) -> bytes:
+    """Serve only explicitly locked originals locally; preserve all other fetch gates."""
+    relative = RUNTIME_LOCKED_NOTICES.get(url)
+    if relative is None:
+        return fetch(url)
+    entries = [item for item in lock.get("files", []) if item.get("path") == relative]
+    if len(entries) != 1 or entries[0].get("source_url") != url:
+        raise IncompleteNotices("Locked runtime notice has missing or ambiguous canonical provenance")
+    path = output / safe_relative(relative.removeprefix("licenses/"))
+    if (path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(output.resolve())
+            or sha256(path) != entries[0].get("sha256")):
+        raise IncompleteNotices("Missing/modified locked runtime notice")
+    return path.read_bytes()
 
 
 def normalized_name(value: str) -> str:
@@ -634,7 +656,7 @@ def main() -> int:
     sources = source_archives(versions, lock)
     module = runtime_wheels()
     try:
-        runtime_inventory = module.collect_runtime_notices(output, fetch)
+        runtime_inventory = module.collect_runtime_notices(output, lambda url: fetch_runtime_notice(url, output, lock))
     except module.RuntimeAuditError as error:
         raise IncompleteNotices(str(error)) from error
     platform_inventories = [runtime_inventory]
