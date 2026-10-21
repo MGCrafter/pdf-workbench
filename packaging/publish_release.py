@@ -227,7 +227,8 @@ def resume_materials(repo, tag, commit, release, directory, natives):
         raise ValueError("Published source archive differs from its receipt")
     public_head(remote); public_head(available[stem + ".json"])
     checksum = directory / "SHA256SUMS"
-    checksum.write_text("".join(before[name]["digest"][7:] + "  " + name + "\n" for name in sorted(natives)))
+    checksum.write_text("".join(before[name]["digest"][7:] + "  " + name + "\n" for name in sorted(natives)),
+                        encoding="utf-8", newline="\n")
     return before, checksum, remote["browser_download_url"]
 
 
@@ -259,7 +260,7 @@ def consolidate(repo, tag, workspace):
         manifest = json.loads(manifest_path.read_text())
         manifest["original_release"] = {"id": release["id"], "tag": tag, "assets": [
             {key: before[name][key] for key in ("id", "name", "size", "digest")} for name in sorted(before)]}
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         source_url = publish_materials(repo, layout, root_commit())
         checksum = layout["app_checksums"]
     # No deletion, replacement or app-note edit occurs until public archive proof.

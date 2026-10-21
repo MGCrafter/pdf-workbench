@@ -14,7 +14,9 @@ separate `source-archives` release. The app release links directly to that TAR.
 It retains the matching application source, dependency source archives,
 build/test records and the original complete checksum inventory. Keep this
 archive available while its corresponding binaries are available.
-The source tag includes build scripts, dependency pins and this document.
+The matching application version tag includes build scripts, dependency pins
+and this document. The `source-archives` tag is only an archive-hosting anchor;
+use the versioned TAR for the corresponding app sources.
 
 The LGPL library source and rebuild information are part of the distribution,
 not replaced by a Qt homepage link. This release supplies complete, unmodified
@@ -163,6 +165,9 @@ consolidation workflows. Recovery loads the current publisher in a separate
 checkout while continuing to verify the original app tag and successful native
 build run. The source archive release points to the repository's oldest commit
 and is explicitly excluded from Latest; app tags are never changed.
+If the Actions token cannot create that older hosting tag, a repository owner
+can create it once and initialize the managed draft release before retrying the
+workflow. Uploads and verification still run in CI before any app asset cleanup.
 
 For existing app releases the cloud runner downloads and verifies only their
 non-native materials. Original native download IDs and bytes stay unchanged.
