@@ -1,0 +1,44 @@
+name: Consolidate release assets
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: Published app versions to consolidate, comma separated
+        type: string
+        default: 'v0.5.3,v0.3.0'
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: release-materials
+  cancel-in-progress: false
+jobs:
+  consolidate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
+      - name: Verify archive preservation and publish compact app downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAGS: ${{ inputs.tags }}
+        run: |
+          python - <<'PY'
+          import os, subprocess, sys
+          arguments = [sys.executable, 'packaging/publish_release.py', 'consolidate']
+          for tag in os.environ['RELEASE_TAGS'].split(','):
+              arguments += ['--tag', tag.strip()]
+          subprocess.run(arguments, check=True)
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-cleanup-results
+          path: build/asset-cleanup/*/result.json
+          if-no-files-found: error
+          retention-days: 7

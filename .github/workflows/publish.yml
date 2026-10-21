@@ -18,6 +18,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
+    concurrency:
+      group: release-materials
+      cancel-in-progress: false
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -30,6 +33,15 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .publisher
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.8'
       - name: Verify the tagged build and its successful jobs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -119,7 +131,7 @@ jobs:
           PY
           cd release-assets
           sha256sum * > SHA256SUMS
-      - name: Publish tested release and all sources together
+      - name: Publish app downloads and a separate verified source archive
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
@@ -127,4 +139,4 @@ jobs:
         run: |
           notes="docs/releases/${RELEASE_TAG}.md"
           if [ ! -f "$notes" ]; then notes="CHANGELOG.md"; fi
-          gh release create "$RELEASE_TAG" release-assets/* --verify-tag --title "PDF Workbench $RELEASE_TAG" --notes-file "$notes"
+          python .publisher/packaging/publish_release.py create --tag "$RELEASE_TAG" --assets release-assets --notes-file "$notes"

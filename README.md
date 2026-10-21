@@ -15,6 +15,8 @@ lokal, ohne Konto und ohne Upload deiner Dokumente.
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
+Quellen und Prüfberichte liegen gebündelt im
+[getrennten Quellenarchiv](https://github.com/MGCrafter/pdf-workbench/releases/tag/source-archives).
 macOS ist noch nicht getestet und hat derzeit kein Downloadpaket.
 
 **Windows:** Das ZIP vollständig entpacken und im entpackten Ordner

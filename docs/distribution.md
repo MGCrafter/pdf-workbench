@@ -7,14 +7,18 @@ artifacts, not the portable public binaries.
 
 ## Release materials
 
-Publish the matching application Git tag and source archive, both native onedir
-archives, checksums, build/test records, and dependency source archives in the
-same GitHub release. Keep sources available while their binaries are available.
+The app release contains only the two native onedir archives and their
+SHA256SUMS. GitHub additionally supplies its automatic source-code downloads.
+A versioned sources-and-reports TAR and its JSON inventory are published in the
+separate `source-archives` release. The app release links directly to that TAR.
+It retains the matching application source, dependency source archives,
+build/test records and the original complete checksum inventory. Keep this
+archive available while its corresponding binaries are available.
 The source tag includes build scripts, dependency pins and this document.
 
 The LGPL library source and rebuild information are part of the distribution,
 not replaced by a Qt homepage link. This release supplies complete, unmodified
-upstream Qt 6.11.2 sources as a separate asset, including PDFium/Chromium and
+upstream Qt 6.11.2 sources inside the sources archive, including PDFium/Chromium and
 third-party sources. The official archive size is 1,019,661,552 bytes, below
 GitHub's per-asset limit. Its official SHA-256 is
 `6dcfbca271d76a6502741a2c0dc6fc98ef7dd0b7b4cfd0abcebb285a86a26f33`.
@@ -24,7 +28,7 @@ rebuild convenience; the PSF license does not require a source offer.
 
 The manifest distinguishes upstream-provided digests (Qt/PyPI) from CPython's
 digest calculated during its HTTPS download. The latter is filled into the
-downloaded source manifest, never guessed. CI downloads the large archives;
+downloaded source manifest, never guessed. CI downloads and bundles the large archives;
 the app and the development host do not.
 
 ## Notice and source gates
@@ -57,10 +61,13 @@ python packaging/collect_notices.py --output build/source-notices --sources-outp
 ```
 
 Downloads use temporary `.partial` names and verify known upstream digests and
-sizes. `source-manifest.json` is written only after success. Upload individual
-source archives, not one potentially oversized combined archive. Publishing
-depends on both successful native builds/tests and successful source acquisition
-and upload. The notice manifest's `complete` field describes notice collection;
+sizes. `source-manifest.json` is written only after success. The publisher validates every downloaded source against its manifest, preserves
+the already-compressed archives in an uncompressed TAR, and reads back every
+member. The TAR must remain below 2,000,000,000 bytes; a future oversized set
+fails instead of publishing incomplete sources. Each app version has its own
+TAR and JSON inventory. Publishing depends on both successful native builds/tests
+and successful source acquisition. The source pair is uploaded, its server
+SHA-256 and size verified and public availability checked before app publication. The notice manifest's `complete` field describes notice collection;
 it does not assert that release assets already exist.
 
 After freezing, verify the included Qt module set:
@@ -81,7 +88,7 @@ testing and packaging it.
 The source job receives only the small `native-sources.json` artifact, then
 adds `--native-sources path/to/native-sources.json` to its source-acquisition
 command. It downloads the exact Ubuntu `.dsc`, original source and Debian/Ubuntu
-patch archives as separate release assets. This also covers LGPL native
+patch archives inside the versioned source bundle. This also covers LGPL native
 dependencies such as GLib instead of treating every bundled `.so` as an
 unbundled operating-system library. Unknown native providers fail the audit.
 Superseded Ubuntu versions are resolved by exact version through Launchpad;
@@ -147,3 +154,21 @@ und bei einer Umbenennung den ursprünglichen Namen unter `upstream_filename`.
 Inhalt und SHA-256 bleiben unverändert. Vor `dpkg-source -x` die betreffenden
 Ubuntu-Quellarchive wieder unter ihrem ursprünglichen Namen ablegen, damit
 die Dateiverweise in der unveränderten `.dsc` passen.
+
+## Compact publication and migration
+
+`packaging/release_layout.py` prepares the two complementary layouts.
+`packaging/publish_release.py` is shared by the release, recovery and one-off
+consolidation workflows. Recovery loads the current publisher in a separate
+checkout while continuing to verify the original app tag and successful native
+build run. The source archive release points to the repository's oldest commit
+and is explicitly excluded from Latest; app tags are never changed.
+
+For existing app releases the cloud runner downloads and verifies only their
+non-native materials. Original native download IDs and bytes stay unchanged.
+All extras, including the old complete SHA256SUMS, are retained before cleanup.
+The public JSON receipt records every original asset ID and digest. After the
+source pair is publicly verified, the checksum asset is replaced by exact ID
+and obsolete extras are removed by exact ID after another identity check.
+Foreign replacements are preserved. A partial cleanup can resume from the
+verified public receipt without downloading large sources again.

@@ -579,8 +579,8 @@ def main() -> int:
         download_sources(sources, sources_output)
     put(output, "SOURCE_AVAILABILITY.md", ("# Corresponding source\n\n"
         "The matching PDF Workbench tag contains the application and build scripts.\n"
-        "The same GitHub release also provides the upstream source archives listed\n"
-        "in manifest.json. Keep those assets available with the binary downloads.\n"
+        "The app release links to a versioned sources-and-reports archive containing\n"
+        "the upstream files listed in manifest.json. Keep that archive publicly available\nwith the binary downloads.\n"
         "Qt libraries are dynamically loaded and may be replaced by compatible\n"
         "modified builds; see the source repository's docs/distribution.md.\n\n"
         "Installed distribution and Ubuntu notice files are a deliberate superset\n"
