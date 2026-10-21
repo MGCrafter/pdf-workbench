@@ -1,6 +1,6 @@
 """Conservative AcroForm filling and explicit field-tree reconstruction.
 
-The supported scope is ordinary text, checkboxes and single-choice fields.
+The supported scope is ordinary text, checkboxes, single-choice fields and radio groups.
 Widgets are rebuilt from the selected pages, rather than cloning their parent
 trees (which can otherwise pull omitted pages into an export).
 """
@@ -39,6 +39,7 @@ class FormField:
     max_length: int | None = None
     page_numbers: tuple[int, ...] = ()
     multiline: bool = False
+    required: bool = False
 
 
 def _chain(widget):
@@ -96,6 +97,20 @@ def _checkbox_on(widget):
     return states[0]
 
 
+def _radio_export_option(widget):
+    """Radio /Opt entries are aligned to the terminal field's widget Kids."""
+    chain=_chain(widget);options=_inherited(chain,"/Opt")
+    if options is None:return None
+    terminal=next(node for node in chain if "/T" in node)
+    widgets=list(_object(terminal.get("/Kids",[widget])))
+    if (not isinstance(options,ArrayObject) or len(options)!=len(widgets)
+            or any(not isinstance(option,TextStringObject) for option in options)):
+        raise _error("Die Optionsgruppe enthält eine ungültige Exportwertliste.")
+    index=next((index for index,item in enumerate(widgets) if _object(item) is widget),None)
+    if index is None:raise _error("Die Optionsgruppe hat keine eindeutige Widgetzuordnung.")
+    return options[index]
+
+
 def validate_forms(reader):
     """Reject forms whose behavior or data cannot be retained in this scope."""
     root = reader.trailer["/Root"]
@@ -124,8 +139,8 @@ def validate_forms(reader):
             raise _error("PDFs mit digitalen Zertifikatssignaturen werden derzeit nicht unterstützt.")
         if kind and kind not in ("/Tx", "/Btn", "/Ch"):
             raise _error("Dieser Formularfeldtyp wird noch nicht unterstützt.")
-        if kind == "/Btn" and flags & ((1 << 15) | (1 << 16)):
-            raise _error("Formulare mit Optionsschaltern oder Aktionsschaltflächen werden noch nicht unterstützt.")
+        if kind == "/Btn" and flags & (1 << 16):
+            raise _error("Formulare mit Aktionsschaltflächen werden noch nicht unterstützt.")
         if kind == "/Tx" and flags & ((1 << 13) | (1 << 20) | (1 << 25)):
             raise _error("Passwort-, Dateiauswahl- und Richtext-Formularfelder werden noch nicht unterstützt.")
         if kind == "/Ch" and flags & ((1 << 18) | (1 << 21)):
@@ -143,6 +158,8 @@ def validate_forms(reader):
             raise _error("Formulare mit Seitenaktionen werden noch nicht unterstützt.")
         for widget in _widgets(page):
             visible_widgets.add(id(widget))
+            if int(widget.get("/F",0)) & (8|16):
+                raise _error("Formularfelder mit NoZoom- oder NoRotate-Sonderverhalten werden noch nicht unterstützt. Bitte entferne diese Eigenschaften in der ursprünglichen Formularanwendung.")
             chain = _chain(widget)
             if id(widget) not in known or not _name(chain) or not _inherited(chain, "/FT"):
                 raise _error("Das Formular enthält unvollständige oder verwaiste Formularfelder.")
@@ -159,6 +176,7 @@ def validate_forms(reader):
                 raise _error("Das Formular enthält ein Feld mit ungültiger Größe.")
             if _inherited(chain, "/FT") == "/Btn":
                 _checkbox_on(widget)
+                if int(_inherited(chain,"/Ff",0)) & (1<<15):_radio_export_option(widget)
     if known - visible_widgets:
         raise _error("Das Formular enthält Felder ohne zugeordnete Dokumentseite. Sie werden noch nicht unterstützt.")
     _read_fields(reader)
@@ -178,21 +196,31 @@ def _read_fields(reader):
             name = _name(chain)
             field_type = _inherited(chain, "/FT")
             flags = int(_inherited(chain, "/Ff", 0))
-            kind = {"/Tx": "text", "/Btn": "checkbox", "/Ch": "choice"}[field_type]
+            kind = ("radio" if field_type == "/Btn" and flags & (1 << 15)
+                    else {"/Tx": "text", "/Btn": "checkbox", "/Ch": "choice"}[field_type])
             value = _inherited(chain, "/V", "")
-            value = str(value) not in ("", "/Off") if kind == "checkbox" else str(value)
+            value = (str(value) not in ("", "/Off") if kind == "checkbox" else
+                     (str(value).removeprefix("/") if str(value) not in ("", "/Off") else "") if kind == "radio" else str(value))
+            options = ((_checkbox_on(widget).removeprefix("/"), str(widget.get("/TU", _checkbox_on(widget).removeprefix("/")))) ,) if kind == "radio" else _options(chain)
             if name in fields:
                 previous = fields[name]
                 if previous.kind != kind or previous.value != value:
                     raise _error("Das Formular enthält widersprüchliche gleichnamige Felder.")
-                fields[name] = replace(previous, page_numbers=tuple(sorted(set((*previous.page_numbers, index + 1)))))
+                combined = dict(previous.options)
+                for key, label in options: combined.setdefault(key, label)
+                fields[name] = replace(previous, page_numbers=tuple(sorted(set((*previous.page_numbers, index + 1)))),
+                                       options=tuple(combined.items()) if kind == "radio" else previous.options)
             else:
                 maximum = _inherited(chain, "/MaxLen")
                 if maximum is not None and (not isinstance(maximum, int) or maximum <= 0):
                     raise _error("Das Formular enthält eine ungültige Zeichenbegrenzung.")
-                fields[name] = FormField(name, str(_inherited(chain, "/TU", name)), kind, value,
-                                        _options(chain), bool(flags & 1), int(maximum) if maximum else None,
-                                        (index + 1,), bool(flags & (1 << 12)))
+                label_chain = chain[1:] if kind == "radio" and len(chain) > 1 else chain
+                fields[name] = FormField(name, str(_inherited(label_chain, "/TU", name)), kind, value,
+                                        options, bool(flags & 1), int(maximum) if maximum else None,
+                                        (index + 1,), bool(flags & (1 << 12)), bool(flags & 2))
+    for field in fields.values():
+        if field.kind == "radio" and field.value and field.value not in {option[0] for option in field.options}:
+            raise _error("Die Optionsgruppe verweist auf eine fehlende Auswahl.")
     return tuple(fields.values())
 
 
@@ -218,7 +246,8 @@ def prepare_form_appearances(reader):
         for widget in _widgets(page):
             name = _name(_chain(widget))
             field = descriptors[name]
-            updates[name] = (_checkbox_on(widget) if field.value else "/Off") if field.kind == "checkbox" else field.value
+            updates[name] = ((_checkbox_on(widget) if field.value else "/Off") if field.kind == "checkbox"
+                             else ("/" + field.value if field.value else "/Off") if field.kind == "radio" else field.value)
     writer = PdfWriter(clone_from=reader)
     _normalize_writer_fields(writer)
     _apply_updates(writer, descriptors, updates)
@@ -252,11 +281,11 @@ def fill_source_form(source, values: Mapping[str, str | bool]):
                 raise _error("Der Formularfeldinhalt muss Text sein.")
             if field.max_length is not None and len(value) > field.max_length:
                 raise _error(f"Das Feld „{field.label}“ erlaubt höchstens {field.max_length} Zeichen.")
-            if field.kind == "choice" and value and value not in {option[0] for option in field.options} and value != field.value:
+            if field.kind in ("choice", "radio") and value and value not in {option[0] for option in field.options} and value != field.value:
                 raise _error(f"Bitte wähle für „{field.label}“ einen angebotenen Wert.")
             if not field.multiline and ("\n" in value or "\r" in value):
                 raise _error(f"Das Feld „{field.label}“ erlaubt nur eine Textzeile.")
-            updates[name] = value
+            updates[name] = ("/" + value if value else "/Off") if field.kind == "radio" else value
     if updates:
         _apply_updates(writer, descriptors, updates)
     stream = io.BytesIO()
@@ -272,9 +301,11 @@ def fill_source_form(source, values: Mapping[str, str | bool]):
 
 def _apply_updates(writer, descriptors, updates):
     _check_encodings(writer, descriptors, updates)
-    plain_updates = {name: value for name, value in updates.items() if descriptors[name].kind != "choice"}
+    plain_updates = {name: value for name, value in updates.items() if descriptors[name].kind not in ("choice", "radio")}
     writer.update_page_form_field_values(None, plain_updates, auto_regenerate=False)
     _update_choices(writer, descriptors, updates)
+    from .form_design import refresh_designed_appearances
+    refresh_designed_appearances(writer, descriptors, updates)
     _decorate_appearances(writer, descriptors, updates)
     _validate_appearances(writer, descriptors, updates)
 
@@ -295,7 +326,7 @@ def _decorate_appearances(writer, fields, updates):
     for page in writer.pages:
         for widget in _widgets(page):
             name = _name(_chain(widget))
-            if name not in updates or fields[name].kind == "checkbox":
+            if name not in updates or fields[name].kind in ("checkbox", "radio"):
                 continue
             appearance = widget["/AP"]["/N"].get_object()
             bounds = appearance["/BBox"]
@@ -351,7 +382,7 @@ def _check_encodings(writer, fields, updates):
         for widget in _widgets(page):
             chain = _chain(widget)
             name = _name(chain)
-            if name not in updates or fields[name].kind == "checkbox":
+            if name not in updates or fields[name].kind in ("checkbox", "radio"):
                 continue
             text = str(updates[name])
             if fields[name].kind == "choice":
@@ -383,8 +414,13 @@ def _update_choices(writer, fields, updates):
             if name not in updates:
                 continue
             parent = widget if "/FT" in widget and "/T" in widget else widget["/Parent"]
-            if fields[name].kind == "checkbox":
+            if fields[name].kind in ("checkbox", "radio"):
                 parent[NameObject("/V")] = NameObject(updates[name])
+                if fields[name].kind == "radio":
+                    state = updates[name] if updates[name] == _checkbox_on(widget) else "/Off"
+                    widget[NameObject("/AS")] = NameObject(state)
+                    if parent is not widget:
+                        widget.pop("/V", None)
                 continue
             if fields[name].kind != "choice":
                 continue
@@ -408,7 +444,7 @@ def _validate_appearances(writer, fields, updates):
     for page in writer.pages:
         for widget in _widgets(page):
             name = _name(_chain(widget))
-            if name not in updates or fields[name].kind == "checkbox":
+            if name not in updates or fields[name].kind in ("checkbox", "radio"):
                 continue
             normal = _object(widget.get("/AP", {})).get("/N")
             if normal is None or not hasattr(normal.get_object(), "get_data"):
@@ -436,6 +472,7 @@ def copy_page_fields(writer, added, reader, source_page, namespace):
             annotations.append(writer._add_object(cloned))
             continue
         chain = _chain(source_widget)
+        is_radio = _inherited(chain, "/FT") == "/Btn" and int(_inherited(chain, "/Ff", 0)) & (1 << 15)
         original_name = _name(chain)
         key = namespace, original_name
         parent = state.get(key)
@@ -448,7 +485,9 @@ def copy_page_fields(writer, added, reader, source_page, namespace):
                     name = "_" + name
             parent = DictionaryObject({NameObject("/T"): TextStringObject(name), NameObject("/Kids"): ArrayObject()})
             for field_key in ("/FT", "/Ff", "/V", "/DV", "/Opt", "/MaxLen", "/Q", "/TU", "/TM"):
-                value = _inherited(chain, field_key)
+                if is_radio and field_key == "/Opt":
+                    continue
+                value = _inherited(chain[1:] if is_radio and field_key == "/TU" and len(chain)>1 else chain, field_key)
                 if value is not None:
                     parent[NameObject(field_key)] = value.clone(writer)
             # Each group keeps the source form's font resources locally. This
@@ -469,13 +508,36 @@ def copy_page_fields(writer, added, reader, source_page, namespace):
             parent_ref = writer._add_object(parent)
             state[key] = parent_ref
             form["/Fields"].append(parent_ref)
+            if is_radio:
+                wanted = getattr(writer, "_workbench_radio_values", None)
+                if wanted is None:
+                    wanted = writer._workbench_radio_values = {}
+                wanted[key] = (_inherited(chain, "/V", NameObject("/Off")),
+                               _inherited(chain, "/DV", NameObject("/Off")))
         parent_ref = state[key]
         parent = parent_ref.get_object()
         excluded = {"/Parent", "/Kids", "/P", "/T", "/FT", "/Ff", "/V", "/DV", "/Opt", "/MaxLen", "/DA", "/DR", "/Q", "/TU", "/TM"}
         widget = DictionaryObject({key: value for key, value in source_widget.items() if key not in excluded}).clone(writer, force_duplicate=True)
         widget[NameObject("/Parent")] = parent_ref
         widget[NameObject("/P")] = added.indirect_reference
+        if is_radio and "/TU" in source_widget:
+            widget[NameObject("/TU")] = source_widget["/TU"].clone(writer)
         widget_ref = writer._add_object(widget)
         parent["/Kids"].append(widget_ref)
         annotations.append(widget_ref)
+        if is_radio:
+            export_option=_radio_export_option(source_widget)
+            if export_option is not None:
+                parent.setdefault(NameObject("/Opt"),ArrayObject()).append(export_option.clone(writer))
+            # A partial-page export may exclude the selected radio option.
+            # Retain only available states; restore an original selection when
+            # its widget is encountered on a later selected page.
+            states = {_checkbox_on(kid.get_object()) for kid in parent["/Kids"]}
+            selected, default = writer._workbench_radio_values[key]
+            selected = str(selected) if str(selected) in states else "/Off"
+            parent[NameObject("/V")] = NameObject(selected)
+            parent[NameObject("/DV")] = NameObject(str(default) if str(default) in states else "/Off")
+            for kid in parent["/Kids"]:
+                child = kid.get_object()
+                child[NameObject("/AS")] = NameObject(selected if selected == _checkbox_on(child) else "/Off")
     added[NameObject("/Annots")] = annotations

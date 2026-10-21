@@ -200,7 +200,7 @@ class FormDialog(QDialog):
                 for value, label in field.options:
                     item = QListWidgetItem(label); item.setData(Qt.ItemDataRole.UserRole,value); editor.addItem(item); item.setSelected(value in field.value)
                 editor.setMaximumHeight(120)
-            elif field.kind == "choice":
+            elif field.kind in ("choice", "radio"):
                 editor = QComboBox()
                 if not any(value == "" for value, _ in field.options):
                     editor.addItem("– Keine Auswahl –", "")
@@ -218,7 +218,7 @@ class FormDialog(QDialog):
             form.addRow((field.label or field.name) + (" (schreibgeschützt)" if field.read_only else ""),editor)
             self.editors[field.name] = editor
         area.setWidget(body); layout.addWidget(area,1)
-        hint = QLabel("Unterstützt werden normale Textfelder, Kontrollkästchen und Auswahllisten. XFA, Skripte und Zertifikatssignaturen werden nicht unterstützt.")
+        hint = QLabel("Unterstützt werden Textfelder, Kontrollkästchen, Auswahllisten und Optionsgruppen. XFA, Skripte und Zertifikatssignaturen werden nicht unterstützt.")
         hint.setWordWrap(True); hint.setObjectName("muted"); layout.addWidget(hint)
         self.error = QLabel(); self.error.setWordWrap(True); semantic_label(self.error,"error"); layout.addWidget(self.error)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok)

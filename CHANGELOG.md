@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.7.0
+
+- Zwei PDF-Versionen lokal vergleichen: Textänderungen, sichtbare Unterschiede,
+  zugeordnete Seiten und gekoppelte Vorschauen mit gemeinsamer Navigation.
+- Interaktive Formulare visuell gestalten: Textfelder, Kontrollkästchen,
+  Dropdowns und Optionsgruppen mit Position, Größe, Feldreihenfolge und Eigenschaften.
+- Bestehende Optionsgruppen ausfüllen und bei Seitenauswahl korrekt exportieren.
+- Wasserzeichen und Seitennummern mit echter PDF-Vorschau, Seitenbereich,
+  eigener Vorlage, Farbe, Transparenz und Drehung ergänzen.
+- Änderungen an Formularen und Seitenmarkierungen als gemeinsame Undo-Schritte;
+  Originaldateien und andere Kopien bleiben geschützt.
+- Native Release-Abnahme auf 18 PDF-Prüfungen und zusätzliche GUI-Nachweise
+  für Vergleich, Formulargestaltung und Seitenmarkierungen erweitert.
+
 ## 0.6.0
 
 - Neue Startansicht, ruhigere helle und dunkle Oberflächen, gruppierte Werkzeuge

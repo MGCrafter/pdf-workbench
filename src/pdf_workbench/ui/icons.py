@@ -55,6 +55,16 @@ class VectorIcon(QIconEngine):
             p.moveTo(5, 3); p.lineTo(14, 3); p.lineTo(19, 8); p.lineTo(19, 21); p.lineTo(5, 21); p.closeSubpath()
             p.moveTo(14, 3); p.lineTo(14, 8); p.lineTo(19, 8)
             if name == "add": p.moveTo(9, 14); p.lineTo(15, 14); p.moveTo(12, 11); p.lineTo(12, 17)
+        elif name == "compare":
+            painter.drawRoundedRect(QRectF(2, 4, 8, 16), 1, 1)
+            painter.drawRoundedRect(QRectF(14, 4, 8, 16), 1, 1)
+            p.moveTo(6, 9); p.lineTo(18, 9); p.moveTo(15, 6); p.lineTo(18, 9); p.lineTo(15, 12)
+            p.moveTo(18, 15); p.lineTo(6, 15); p.moveTo(9, 12); p.lineTo(6, 15); p.lineTo(9, 18)
+        elif name == "watermark":
+            painter.drawRoundedRect(QRectF(4, 2, 16, 20), 1.5, 1.5)
+            p.moveTo(7, 16); p.lineTo(12, 7); p.lineTo(17, 16)
+            p.moveTo(9, 13); p.lineTo(15, 13)
+            p.moveTo(3, 20); p.lineTo(21, 4)
         elif name == "duplicate":
             painter.drawRoundedRect(QRectF(8, 8, 12, 13), 1.5, 1.5)
             p.moveTo(15, 5); p.lineTo(15, 3); p.lineTo(3, 3); p.lineTo(3, 16); p.lineTo(5, 16)

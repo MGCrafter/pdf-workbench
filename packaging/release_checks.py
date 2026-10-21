@@ -12,3 +12,15 @@ V06_GUI_CHECKS = frozenset((
     "AcroForm edit/export/reopen/undo",
     "reduced motion and compact themes",
 ))
+
+V07_CORE_CHECKS = frozenset((
+    "test_document_comparison_runtime",
+    "test_form_design_radio_runtime",
+    "test_page_marks_selected_copy_runtime",
+))
+
+V07_GUI_CHECKS = frozenset((
+    "PDF comparison text/visual alignment and read-only navigation",
+    "AcroForm design create/edit/delete/radio and undo",
+    "page marks preview/export/reopen/selection and undo",
+))

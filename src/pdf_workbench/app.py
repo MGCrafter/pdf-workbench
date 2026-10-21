@@ -77,6 +77,7 @@ class MainWindow(QMainWindow):
         self._page_by_uid = {}
         self._form_field_cache = {}
         self._pending_locked_files = []
+        self._after_job_callback = None
         self._closing_requested = False
         self.render_broker = RenderBroker(self)
         self.render_broker.closed.connect(self._rendering_closed)
@@ -366,10 +367,22 @@ class MainWindow(QMainWindow):
         annotate.addSeparator()
         self.annotations_action = self._action(annotate, "Anmerkungen bearbeiten oder löschen …", None, self.manage_annotations, "list")
         self.form_action = self._action(annotate, "Formular ausfüllen …", "Ctrl+Shift+F", self.fill_form, "form")
+        tools_menu = self.menuBar().addMenu("&Werkzeuge")
+        self.compare_action = self._action(tools_menu, "PDF-Versionen vergleichen …", None, self.compare_pdfs, "compare")
+        tools_menu.addSeparator()
+        self.form_editor_action = self._action(tools_menu, "Formularfelder bearbeiten …", "Ctrl+Alt+F", self.edit_form_fields, "form")
+        tools_menu.addAction(self.form_action)
+        tools_menu.addSeparator()
+        self.watermark_action = self._action(tools_menu, "Wasserzeichen …", None, self.edit_page_marks, "watermark")
+        self.page_marks_action = self.watermark_action
+        self.numbering_action = self._action(tools_menu, "Seitennummern …", None, lambda: self.edit_page_marks(mode="numbering"), "range")
         help_menu = self.menuBar().addMenu("&Hilfe"); self._action(help_menu, "Über PDF Workbench", None, self.about)
         document_tools = QMenu(self.document_tools_button)
         document_tools.addAction(self.images_action); document_tools.addSeparator()
-        document_tools.addAction(self.form_action); document_tools.addAction(self.ocr_action)
+        document_tools.addAction(self.compare_action); document_tools.addSeparator()
+        document_tools.addAction(self.form_editor_action); document_tools.addAction(self.form_action)
+        document_tools.addAction(self.watermark_action); document_tools.addAction(self.numbering_action)
+        document_tools.addAction(self.ocr_action)
         document_tools.addSeparator(); document_tools.addAction(self.compress_action); document_tools.addAction(self.protect_action)
         self.document_tools_menu = document_tools
         self.document_tools_button.setMenu(document_tools)
@@ -473,6 +486,9 @@ class MainWindow(QMainWindow):
         if source and source.source_id not in self._form_field_cache:
             self._form_field_cache[source.source_id] = bool(form_fields(source))
         self.form_action.setEnabled(bool(source and self._form_field_cache.get(source.source_id)) and not busy)
+        self.compare_action.setEnabled(not busy)
+        for action in (self.form_editor_action, self.watermark_action, self.numbering_action):
+            action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
         self.welcome_workspace.images_button.setEnabled(not busy)
         self.document_tools_button.setEnabled(not busy)
         for button in (self.separate_button, self.split_button, self.export_button):
@@ -755,10 +771,13 @@ class MainWindow(QMainWindow):
 
     def job_finished(self):
         job, self.job = self.job, None
+        after_job, self._after_job_callback = self._after_job_callback, None
         self.progress.hide(); self.cancel_button.hide(); self.update_controls()
         if job: job.deleteLater()
         if self._pending_locked_files:
             QTimer.singleShot(0, self._request_import_passwords)
+        if after_job and not self._closing_requested and not (job and job.cancel_event.is_set()):
+            QTimer.singleShot(0, after_job)
 
     def move(self, direction):
         if not self.job:
@@ -872,6 +891,90 @@ class MainWindow(QMainWindow):
             self.set_status("Formular ausgefüllt. Mit „PDF speichern“ in eine neue Datei übernehmen. Rückgängig ist verfügbar.")
         self.start_job(task, success)
 
+    def compare_pdfs(self, checked=False, paths=()):
+        if self.job or self._closing_requested:
+            return
+        if not paths:
+            paths, _ = QFileDialog.getOpenFileNames(self, "Zwei PDF-Versionen zum Vergleichen wählen", "", "PDF-Dateien (*.pdf)", options=file_dialog_options())
+        if not paths:
+            return
+        if len(paths) == 1:
+            second, _ = QFileDialog.getOpenFileName(self, "Zweite PDF-Version wählen", str(Path(paths[0]).parent), "PDF-Dateien (*.pdf)", options=file_dialog_options())
+            if not second:
+                return
+            paths = [paths[0], second]
+        if len(paths) != 2:
+            self.set_status("Bitte genau zwei PDF-Dateien zum Vergleichen auswählen.", "warning")
+            return
+        self._load_comparison_sources(tuple(paths))
+
+    def _load_comparison_sources(self, paths, loaded=(), password=None):
+        if self.job or self._closing_requested:
+            return
+        path = paths[len(loaded)]
+        def task(cancel, progress):
+            progress(0, f"Vergleich: {Path(path).name} öffnen …")
+            try:
+                return load_source(path, cancel, password=password), False
+            except (PasswordRequiredError, IncorrectPasswordError) as error:
+                return None, isinstance(error, IncorrectPasswordError)
+        def success(outcome):
+            self._after_job_callback = lambda: self._continue_comparison(paths, loaded, outcome)
+        self.start_job(task, success)
+
+    def _continue_comparison(self, paths, loaded, outcome):
+        if self.job or self._closing_requested:
+            return
+        source, incorrect = outcome
+        if source is None:
+            password = PasswordDialog.get_password(self, source_name=Path(paths[len(loaded)]).name, incorrect=incorrect)
+            if password is None:
+                self.set_status("Dokumentvergleich abgebrochen.")
+                return
+            self._load_comparison_sources(paths, loaded, password)
+            return
+        loaded = (*loaded, source)
+        if len(loaded) < 2:
+            self._load_comparison_sources(paths, loaded)
+            return
+        from .ui.compare_dialog import ComparisonDialog
+        ComparisonDialog(loaded[0], loaded[1], self, motion=self.motion).exec()
+
+    def edit_form_fields(self):
+        if self.job or self.preview.selection_pending or self._active_uid not in self._page_by_uid:
+            return
+        from .ui.form_editor import FormEditorDialog
+        page = self._page_by_uid[self._active_uid]
+        source = self.workspace.sources[page.source_id]
+        selected, active = self.selected_ids(), self._active_uid
+        try:
+            updated = FormEditorDialog.get_source(self, source, page_index=page.page_index, workspace_rotation=page.rotation)
+        except PdfWorkbenchError as error:
+            self.show_error("Formularfelder konnten nicht übernommen werden.", str(error))
+            return
+        if updated is not None and updated != source:
+            self.workspace.replace_source(source.source_id, updated)
+            self.refresh(selected, active)
+            self.set_status("Formularfelder übernommen. Mit „PDF speichern“ als neue Datei speichern; Rückgängig ist verfügbar.")
+
+    def edit_page_marks(self, checked=False, *, mode="watermark"):
+        if self.job or not self.workspace.pages or self.preview.selection_pending:
+            return
+        from .ui.page_marks_dialog import PageMarksDialog
+        selected, active = self.selected_ids(), self._active_uid
+        request = PageMarksDialog.get_request(self, self.workspace, selected, mode=mode)
+        if request is None:
+            return
+        from .page_marks import prepare_page_marks
+        sources, pages = dict(self.workspace.sources), tuple(self.workspace.pages)
+        def task(cancel, progress):
+            return prepare_page_marks(sources, pages, request.options, request.target_ids, cancel, progress)
+        def success(result):
+            self.workspace.apply_page_replacements(result.sources, result.pages)
+            self.refresh(selected, active)
+            self.set_status("Wasserzeichen und Seitennummern übernommen. Als neue PDF speichern; Rückgängig ist verfügbar.")
+        self.start_job(task, success)
+
     def save_separate_pages(self):
         if self.job: return
         if self.preview.selection_pending:
@@ -933,7 +1036,7 @@ class MainWindow(QMainWindow):
         box.exec()
 
     def about(self):
-        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Komprimierung, Passwortschutz und normale AcroForms<br>mit Textfeldern, Kontrollkästchen und einfacher Auswahl.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>XFA, Skripte und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
+        QMessageBox.about(self, "Über PDF Workbench", f"<b>PDF Workbench {__version__}</b><br>Freie, lokale PDF-Werkzeuge.<br><br>Seiten ordnen, zusammenfügen, trennen und drehen.<br>Kommentare, Markierungen, Unterschriften, Textfelder,<br>Bilder und Stempel; Suche und Bilder als PDF-Seiten.<br>Komprimierung, Passwortschutz und PDF-Versionsvergleich.<br>Formulare mit Textfeldern, Kontrollkästchen, Dropdowns<br>und Optionsgruppen gestalten und ausfüllen.<br>Wasserzeichen und Seitennummern mit Vorschau.<br>Optionale lokale Texterkennung mit Tesseract.<br><br>GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>Liberation Sans · SIL Open Font License<br>Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>XFA, Skripte und Zertifikatssignaturen sind nicht unterstützt.<br>Dokumentweite Lesezeichen, Tags und Anhänge werden<br>nicht erhalten; PDF/A-Konformität ist nicht garantiert.<br><br>Unabhängiges Projekt ohne Adobe-Programmcode.")
 
     def dragEnterEvent(self, event):
         if not self.job and event.mimeData().hasUrls(): event.acceptProposedAction()

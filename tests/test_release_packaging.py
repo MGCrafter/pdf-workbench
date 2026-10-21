@@ -155,6 +155,32 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             self.write_report(invalid)
             with self.assertRaises(ValueError): self.verify(target)
 
+    def test_v07_cannot_use_old_or_incomplete_feature_acceptance(self):
+        self.version = self.provenance['app_version'] = '0.7.0'
+        previous = ['appearance dark/light/system', 'appearance persisted',
+                    'appearance preserves document and viewport', 'appearance document/export colors',
+                    'appearance dialogs and icons', 'objects select/move/duplicate/delete/undo',
+                    'objects text/image/stamp/symbol PDF roundtrip', 'objects bundled font and Unicode',
+                    'asynchronous text search', 'images to PDF and undo',
+                    'local OCR searchable text and preserved image', *release.V06_GUI_CHECKS]
+        for target, platform_name in (('linux', 'xcb'), ('win32', 'windows')):
+            report, _ = self.prepare(target, platform_name)
+            report['core'].update(tests=18, checks=sorted(release.V06_CORE_CHECKS | release.V07_CORE_CHECKS))
+            report['gui']['checks'] = previous + sorted(release.V07_GUI_CHECKS)
+            self.write_report(report)
+            self.assertEqual(self.verify(target), report)
+            for section, checks in (('core', release.V07_CORE_CHECKS), ('gui', release.V07_GUI_CHECKS)):
+                for missing in checks:
+                    invalid = copy.deepcopy(report)
+                    invalid[section]['checks'].remove(missing)
+                    self.write_report(invalid)
+                    with self.subTest(target=target, missing=missing), self.assertRaises(ValueError):
+                        self.verify(target)
+            report['core']['tests'] = 17
+            self.write_report(report)
+            with self.assertRaises(ValueError):
+                self.verify(target)
+
     def test_previous_build_cannot_be_released_as_a_different_checkout(self):
         self.prepare()
         identities = {

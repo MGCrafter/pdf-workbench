@@ -96,6 +96,25 @@ class UiRenderingTests(unittest.TestCase):
             self.assertTrue(preview.image.isNull())
         finally: preview.close()
 
+    def test_form_value_change_is_visible_in_async_main_preview(self):
+        from pdf_workbench.form_design import FieldPlacement, FormDesign, apply_form_designs
+        from pdf_workbench.forms import fill_source_form, form_fields
+        designed = apply_form_designs(self.source, (
+            FormDesign('preview', 'preview', 'Name', 'text',
+                       (FieldPlacement(0, (.1, .3, .9, .4)),), value='BEFORE'),
+        ))
+        changed = fill_source_form(designed, {'preview': 'AFTER VALUE'})
+        originals = (designed.data, changed.data)
+        broker = self.broker()
+        before_key = broker.request(designed, PageRef('before', designed.source_id, 0), (400, 600), 'preview')
+        after_key = broker.request(changed, PageRef('after', changed.source_id, 0), (400, 600), 'preview')
+        pump_until(lambda: broker.get(before_key) is not None and broker.get(after_key) is not None)
+        self.assertFalse(broker.failures)
+        before, after = broker.get(before_key)[0], broker.get(after_key)[0]
+        self.assertNotEqual(before, after)
+        self.assertEqual((designed.data, changed.data), originals)
+        self.assertEqual(form_fields(changed)[0].value, 'AFTER VALUE')
+
     def test_fit_width_has_no_horizontal_overflow(self):
         preview = Preview(self.broker()); preview.resize(400, 300); preview.show()
         try:

@@ -4,8 +4,9 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-**Version 0.6.0** ergänzt eine neue Oberfläche, Komprimierung, Passwortschutz
-und das Ausfüllen vorhandener PDF-Formulare.
+**Der Entwicklungsstand 0.7.0** ergänzt einen Dokumentvergleich, einen visuellen
+Formulareditor sowie Wasserzeichen und Seitennummern. Der aktuelle veröffentlichte
+Download ist noch Version 0.6.0.
 
 ## Download
 
@@ -51,6 +52,9 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Helle oder dunkle Oberfläche; auf Wunsch passend zur Systemeinstellung.
 - Ab 0.6: Komprimieren mit Größenvergleich, geschützte PDFs öffnen und mit
   AES-256 speichern, normale AcroForms ausfüllen.
+- Ab 0.7: PDF-Versionen mit Text- und Bildänderungen nebeneinander vergleichen.
+- Interaktive Textfelder, Kontrollkästchen, Dropdowns und Optionsgruppen gestalten.
+- Wasserzeichen und Seitennummern mit Vorschau auf alle oder ausgewählte Seiten setzen.
 
 ## Loslegen
 
@@ -109,10 +113,18 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 - PDFs mit Öffnungspasswort lassen sich entsperren und als neue Datei mit
   AES-256 schützen. Normale Exporte, Einzelseiten und OCR bleiben unverschlüsselt.
   Passwörter werden nicht in Einstellungen oder Dokument-Snapshots gespeichert.
-- Normale AcroForms mit Textfeldern, Kontrollkästchen und Einfachauswahl werden
-  unterstützt. XFA, Zertifikatssignaturen, Optionsschalter, Aktionsschaltflächen,
-  Skripte, Berechnungen und mehrdeutige oder nicht seitengebundene Felder werden
-  abgewiesen. Neue interaktive Formularfelder können noch nicht erstellt werden.
+- Normale AcroForms mit Textfeldern, Kontrollkästchen, Einfachauswahl und
+  Optionsgruppen werden unterstützt. XFA, Zertifikatssignaturen, Aktionsschaltflächen,
+  Skripte, Berechnungen, Felder mit NoRotate-/NoZoom-Sonderverhalten sowie mehrdeutige
+  oder nicht seitengebundene Felder werden
+  abgewiesen. Geänderte und neue Felder verwenden schlichte Feldansichten;
+  Pflichtfelder kennzeichnen keine geprüfte inhaltliche Vollständigkeit.
+- Der Vergleich prüft sichtbare Seiten und auslesbaren Text, mit höchstens
+  300 Seiten je Datei und 1.000 Pixeln an der längsten Kante. Er erkennt keine
+  beliebig kleinen Änderungen und prüft keine Metadaten oder Zertifikate. Scans
+  erhalten dabei keine automatische OCR.
+- Wasserzeichen und Seitennummern werden zum Seiteninhalt. Nach erneutem Öffnen
+  haben sie keine eigenen Bearbeitungsgriffe; vor dem Speichern gibt es Undo.
 - Bildkomprimierung kann Details verlieren; spezielle Bildformate und Masken
   bleiben unverändert. Es gibt keine garantierte Größenersparnis.
 - Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
