@@ -138,9 +138,9 @@ def _retry_delay(error: Exception, attempt: int) -> float:
     return min(MAX_RETRY_DELAY,delay)
 
 
-def _network_retry(url: str, operation):
+def _network_retry(url: str, operation, attempts: int = NETWORK_ATTEMPTS):
     """Retry only transient transport failures; validation exceptions escape."""
-    for attempt in range(1,NETWORK_ATTEMPTS+1):
+    for attempt in range(1,attempts+1):
         try:
             return operation()
         except Exception as error:
@@ -152,9 +152,9 @@ def _network_retry(url: str, operation):
                 if isinstance(error,(urllib.error.URLError,ssl.SSLError,socket.gaierror,http.client.HTTPException)):
                     raise IncompleteNotices(f"Upstream request failed for {url}: {type(error).__name__}: {error}") from error
                 raise
-            if attempt == NETWORK_ATTEMPTS:
-                raise IncompleteNotices(f"Temporary upstream failure after {NETWORK_ATTEMPTS} attempts for {url}: {type(error).__name__}: {error}") from error
-            print(f"Temporary upstream failure ({type(error).__name__}: {error}); retry {attempt}/{NETWORK_ATTEMPTS-1} in {delay:g}s: {url}",file=sys.stderr,flush=True)
+            if attempt == attempts:
+                raise IncompleteNotices(f"Temporary upstream failure after {attempts} attempts for {url}: {type(error).__name__}: {error}") from error
+            print(f"Temporary upstream failure ({type(error).__name__}: {error}); retry {attempt}/{attempts-1} in {delay:g}s: {url}",file=sys.stderr,flush=True)
             time.sleep(delay)
 
 
@@ -168,13 +168,14 @@ def _response_length(response) -> int | None:
     return int(value)
 
 
-def fetch(url: str, limit: int = 16 * 1024 * 1024) -> bytes:
+def fetch(url: str, limit: int = 16 * 1024 * 1024, *, timeout: float = 90,
+          attempts: int = NETWORK_ATTEMPTS) -> bytes:
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme != "https":
         raise IncompleteNotices(f"Source URL must use HTTPS: {url}")
     def read_once():
         request = urllib.request.Request(url, headers={"User-Agent": "PDFWorkbench-release-notices/1"})
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             if urllib.parse.urlparse(response.url).scheme != "https":
                 raise IncompleteNotices("Refusing insecure upstream redirect")
             length = _response_length(response)
@@ -184,7 +185,7 @@ def fetch(url: str, limit: int = 16 * 1024 * 1024) -> bytes:
             if length is not None and len(data) < length:
                 raise http.client.IncompleteRead(data,length-len(data))
         return data
-    data = _network_retry(url,read_once)
+    data = _network_retry(url,read_once,attempts)
     if not data or len(data) > limit:
         raise IncompleteNotices(f"Missing or unexpectedly large notice/metadata: {url}")
     return data
@@ -451,42 +452,124 @@ def native_source_inventory(toc: Path, runtime_inventory: dict | None = None) ->
             "packages": [packages[key] for key in sorted(packages)], "exclusions": exclusions}
 
 
-def _ubuntu_package_sources(package: dict) -> list[dict]:
+def _ubuntu_identity(package: dict) -> tuple[str, str]:
     name, version = package["source_package"], package["source_version"]
+    if (not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", name)
+            or not re.fullmatch(r"[A-Za-z0-9.+:~_-]+", version)):
+        raise IncompleteNotices("Invalid Ubuntu source package identity")
+    return name, version
+
+
+def _ubuntu_descriptor(package: dict, dsc_name: str, data: bytes,
+                       dsc_url: str, source_urls: dict[str, str] | None = None) -> list[dict]:
+    """Require the exact installed source identity and every original SHA-256."""
+    name, version = _ubuntu_identity(package)
+    if safe_relative(dsc_name).name != dsc_name or not dsc_name.endswith(".dsc"):
+        raise IncompleteNotices("Unsafe Ubuntu source descriptor filename")
+    if urllib.parse.urlparse(dsc_url).scheme != "https":
+        raise IncompleteNotices("Ubuntu descriptor URL must use HTTPS")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeError as error:
+        raise IncompleteNotices("Ubuntu descriptor is not readable UTF-8") from error
+    if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
+        text = text.replace("\r\n", "\n")
+        if "\n\n" not in text or "-----BEGIN PGP SIGNATURE-----" not in text:
+            raise IncompleteNotices("Ubuntu descriptor has an incomplete signed envelope")
+        text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
+    control = Parser().parsestr(text)
+    if (len(control.get_all("Source", [])) != 1 or len(control.get_all("Version", [])) != 1
+            or control.get("Source") != name or control.get("Version") != version):
+        raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
+    records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
+                "url": dsc_url, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
+                "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
+    checksums = control.get("Checksums-Sha256", "").strip().splitlines()
+    if not checksums or len(control.get_all("Checksums-Sha256", [])) != 1:
+        raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
+    seen = {dsc_name}
+    for line in checksums:
+        fields = line.split()
+        if len(fields) != 3:
+            raise IncompleteNotices("Ubuntu descriptor contains an invalid SHA-256 source record")
+        digest, size, filename = fields
+        if (not re.fullmatch(r"[0-9a-f]{64}", digest) or not re.fullmatch(r"[1-9][0-9]{0,9}", size)
+                or int(size) > 2 * 1024 * 1024 * 1024 or safe_relative(filename).name != filename
+                or filename in seen or (source_urls is not None and filename not in source_urls)):
+            raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
+        seen.add(filename)
+        url = (source_urls[filename] if source_urls is not None
+               else urllib.parse.urljoin(dsc_url, urllib.parse.quote(filename, safe="")))
+        if urllib.parse.urlparse(url).scheme != "https":
+            raise IncompleteNotices("Ubuntu source archive URL must use HTTPS")
+        records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
+                        "url": url, "sha256": digest, "size": int(size), "digest_source": dsc_url})
+    return records
+
+
+def _pool_availability_failure(error: Exception) -> str | None:
+    """Only missing files or transport failures permit switching source providers."""
+    current, seen = error, set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, urllib.error.HTTPError) and current.code in (404, 410):
+            return "missing"
+        if _temporary_network_error(current):
+            return "host-unavailable"
+        current = current.__cause__
+    return None
+
+
+def _ubuntu_pool_sources(package: dict) -> list[dict] | None:
+    name, version = _ubuntu_identity(package)
+    # Epochs belong to the descriptor's Version field, never its filename.
+    filename = f"{name}_{version.split(':', 1)[-1]}.dsc"
+    prefix = name[:4] if name.startswith("lib") else name[0]
+    unavailable = set()
+    for component in ("main", "universe", "restricted", "multiverse"):
+        for host in ("archive.ubuntu.com", "security.ubuntu.com"):
+            if host in unavailable:
+                continue
+            url = (f"https://{host}/ubuntu/pool/{component}/{prefix}/{name}/"
+                   + urllib.parse.quote(filename, safe=""))
+            try:
+                # One bounded probe; a transient host outage goes to the other
+                # canonical host, not five 90-second attempts per component.
+                data = fetch(url, limit=512 * 1024, timeout=12, attempts=1)
+            except Exception as error:
+                availability = _pool_availability_failure(error)
+                if availability is None:
+                    raise
+                if availability == "host-unavailable":
+                    unavailable.add(host)
+                continue
+            return _ubuntu_descriptor(package, filename, data, url)
+    return None
+
+
+def _launchpad_package_sources(package: dict) -> list[dict]:
+    """Historical versions removed from the current archive can remain in Launchpad."""
+    name, version = _ubuntu_identity(package)
     query = urllib.parse.urlencode({"ws.op": "getPublishedSources", "source_name": name,
                                     "version": version, "exact_match": "true"})
-    publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query))
+    publications = json.loads(fetch("https://api.launchpad.net/1.0/ubuntu/+archive/primary?" + query,
+                                   timeout=15, attempts=2))
     publication = next((item for item in publications.get("entries", []) if
                         item["source_package_name"] == name and item["source_package_version"] == version), None)
     if not publication:
         raise IncompleteNotices(f"Exact Ubuntu source publication unavailable: {name} {version}")
-    urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls"))
+    urls = json.loads(fetch(publication["self_link"] + "?ws.op=sourceFileUrls", timeout=15, attempts=2))
     by_name = {urllib.parse.unquote(urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]): url for url in urls}
     dsc_names = [filename for filename in by_name if filename.endswith(".dsc")]
     if len(dsc_names) != 1:
         raise IncompleteNotices(f"No unique Ubuntu source descriptor for {name} {version}")
     dsc_name = dsc_names[0]
-    data = fetch(by_name[dsc_name])
-    text = data.decode("utf-8")
-    if text.startswith("-----BEGIN PGP SIGNED MESSAGE-----"):
-        text = text.split("\n\n", 1)[1].split("-----BEGIN PGP SIGNATURE-----", 1)[0]
-    control = Parser().parsestr(text)
-    if control.get("Source") != name or control.get("Version") != version:
-        raise IncompleteNotices("Ubuntu descriptor does not match the collected native version")
-    records = [{"component": "Ubuntu source: " + name, "version": version, "filename": dsc_name,
-                "url": by_name[dsc_name], "sha256": hashlib.sha256(data).hexdigest(), "size": len(data),
-                "digest_source": "Calculated from canonical Ubuntu HTTPS descriptor"}]
-    checksums = control.get("Checksums-Sha256", "").strip().splitlines()
-    if not checksums:
-        raise IncompleteNotices("Ubuntu descriptor lacks SHA-256 source checksums")
-    for line in checksums:
-        digest, size, filename = line.split()
-        if not re.fullmatch(r"[0-9a-f]{64}", digest) or filename not in by_name:
-            raise IncompleteNotices("Ubuntu descriptor references unavailable/invalid source data")
-        records.append({"component": "Ubuntu source: " + name, "version": version, "filename": filename,
-                        "url": by_name[filename], "sha256": digest, "size": int(size),
-                        "digest_source": by_name[dsc_name]})
-    return records
+    data = fetch(by_name[dsc_name], limit=512 * 1024, timeout=15, attempts=2)
+    return _ubuntu_descriptor(package, dsc_name, data, by_name[dsc_name], by_name)
+
+
+def _ubuntu_package_sources(package: dict) -> list[dict]:
+    return _ubuntu_pool_sources(package) or _launchpad_package_sources(package)
 
 
 def ubuntu_source_archives(inventory: dict) -> list[dict]:
