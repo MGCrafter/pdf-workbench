@@ -281,10 +281,11 @@ def prepare_assets(
     # require the complete feature report and its exact builder linkage here as
     # well, before uploading any archive. This never executes downloaded code.
     if tuple(map(int, tag[1:].split('.')[:2])) >= (0, 8):
-        from release_checks import (V06_CORE_CHECKS, V06_GUI_CHECKS,
+        from release_checks import (V04_GUI_CHECKS, V05_GUI_CHECKS, V06_CORE_CHECKS, V06_GUI_CHECKS,
             V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS)
         required_core = V06_CORE_CHECKS | V07_CORE_CHECKS | V08_CORE_CHECKS
-        required_gui = V06_GUI_CHECKS | V07_GUI_CHECKS | V08_GUI_CHECKS
+        required_gui = V04_GUI_CHECKS | V05_GUI_CHECKS | V06_GUI_CHECKS | V07_GUI_CHECKS | V08_GUI_CHECKS
+        shared_source_hashes = None
         for platform_name in ('linux', 'windows'):
             info_path = paths.get(f'PDFWorkbench-{tag}-{platform_name}-BUILD-INFO.json')
             report_path = paths.get(f'PDFWorkbench-{tag}-{platform_name}-acceptance.json')
@@ -314,9 +315,15 @@ def prepare_assets(
                     or provenance.get('app_version') != tag[1:]
                     or provenance.get('source_sha256') != info.get('source_sha256')
                     or not isinstance(info.get('source_sha256'), dict) or not info['source_sha256']
+                    or any(not isinstance(path, str) or not path or not isinstance(digest, str) or not _HASH.fullmatch(digest)
+                           for path, digest in info['source_sha256'].items())
                     or not _HASH.fullmatch(str(info.get('executable_sha256', '')))
                     or report.get('executable_sha256') != info.get('executable_sha256')):
                 raise ValueError('Complete native 0.8 acceptance must match its builder and source commit')
+            if shared_source_hashes is None:
+                shared_source_hashes = info['source_sha256']
+            elif shared_source_hashes != info['source_sha256']:
+                raise ValueError('Both native 0.8 builders must use identical source hashes')
 
     members = [records[name] for name in sorted(paths) if name not in native_names]
     # Avoid creating even a partial huge output when its minimum size cannot fit.

@@ -109,7 +109,7 @@ class ReleaseLayoutTests(unittest.TestCase):
         for path in self.input.iterdir(): path.unlink()
         core = {'tests': 23, 'failures': 0, 'errors': 0, 'skipped': [],
                 'checks': sorted(checks.V06_CORE_CHECKS | checks.V07_CORE_CHECKS | checks.V08_CORE_CHECKS)}
-        gui_checks = sorted(checks.V06_GUI_CHECKS | checks.V07_GUI_CHECKS | checks.V08_GUI_CHECKS)
+        gui_checks = sorted(checks.V04_GUI_CHECKS | checks.V05_GUI_CHECKS | checks.V06_GUI_CHECKS | checks.V07_GUI_CHECKS | checks.V08_GUI_CHECKS)
         executable_sha = 'b' * 64; source_hashes = {'src/app.py': 'c' * 64}
         for target, platform_name in (('linux', 'xcb'), ('windows', 'windows')):
             provenance = {'app_version': '0.8.0', 'source_commit': self.commit, 'source_sha256': source_hashes}
@@ -127,8 +127,10 @@ class ReleaseLayoutTests(unittest.TestCase):
             for target in ('linux', 'windows'):
                 name = f'PDFWorkbench-{self.tag}-{target}-acceptance.json'
                 original = self.files[name]
+                info_name = f'PDFWorkbench-{self.tag}-{target}-BUILD-INFO.json'
+                original_info = self.files[info_name]
                 cases = []
-                for section, required in (('core', checks.V08_CORE_CHECKS), ('gui', checks.V08_GUI_CHECKS)):
+                for section, required in (('core', checks.V08_CORE_CHECKS), ('gui', checks.V04_GUI_CHECKS | checks.V05_GUI_CHECKS | checks.V08_GUI_CHECKS)):
                     for missing in required:
                         broken = json.loads(original); broken[section]['checks'].remove(missing); cases.append(broken)
                 broken = json.loads(original); broken['core']['tests'] = 22; cases.append(broken)
@@ -137,11 +139,48 @@ class ReleaseLayoutTests(unittest.TestCase):
                 broken = json.loads(original); broken['gui']['qt_platform'] = 'offscreen'; cases.append(broken)
                 broken = json.loads(original); broken['core']['skipped'] = ['not installed']; cases.append(broken)
                 for index, case in enumerate(cases):
-                    self.files[name] = json.dumps(case).encode(); (self.input / name).write_bytes(self.files[name]); self.write_checksums()
+                    self.files[name] = json.dumps(case).encode(); (self.input / name).write_bytes(self.files[name])
+                    linked_info = json.loads(original_info)
+                    linked_info['acceptance'].update(core=case['core'], gui_checks=case['gui']['checks'], qt_platform=case['gui']['qt_platform'])
+                    self.files[info_name] = json.dumps(linked_info).encode(); (self.input / info_name).write_bytes(self.files[info_name])
+                    self.write_checksums()
                     with self.subTest(target=target, case=index), self.assertRaises(ValueError):
                         self.output = self.root / f'invalid-{target}-{index}'
                         self.prepare()
-                self.files[name] = original; (self.input / name).write_bytes(original); self.write_checksums()
+                self.files[name] = original; (self.input / name).write_bytes(original)
+                self.files[info_name] = original_info; (self.input / info_name).write_bytes(original_info); self.write_checksums()
+                # Each native report still matches its own builder; only the
+                # cross-platform source identity differs in these cases.
+                for change in ('changed_hash', 'missing_file', 'extra_file'):
+                    altered_info, altered_report = json.loads(original_info), json.loads(original)
+                    hashes = dict(altered_info['source_sha256'])
+                    if change == 'changed_hash': hashes['src/app.py'] = 'd' * 64
+                    elif change == 'missing_file': hashes = {'src/other.py': 'c' * 64}
+                    else: hashes['src/extra.py'] = 'e' * 64
+                    altered_info['source_sha256'] = hashes; altered_report['provenance']['source_sha256'] = hashes
+                    self.files[name] = json.dumps(altered_report).encode(); (self.input / name).write_bytes(self.files[name])
+                    self.files[info_name] = json.dumps(altered_info).encode(); (self.input / info_name).write_bytes(self.files[info_name]); self.write_checksums()
+                    self.output = self.root / f'cross-source-{target}-{change}'
+                    with self.subTest(target=target, change=change), self.assertRaisesRegex(ValueError, 'identical source hashes'):
+                        self.prepare()
+                self.files[name] = original; (self.input / name).write_bytes(original)
+                self.files[info_name] = original_info; (self.input / info_name).write_bytes(original_info); self.write_checksums()
+
+            # Equal malformed maps on both platforms must not satisfy identity.
+            baseline = dict(self.files)
+            for invalid in ('not-a-digest', 'f' * 63, None, True):
+                for target in ('linux', 'windows'):
+                    info_name = f'PDFWorkbench-{self.tag}-{target}-BUILD-INFO.json'
+                    report_name = f'PDFWorkbench-{self.tag}-{target}-acceptance.json'
+                    info = json.loads(baseline[info_name]); report = json.loads(baseline[report_name])
+                    info['source_sha256'] = {'src/app.py': invalid}; report['provenance']['source_sha256'] = info['source_sha256']
+                    self.files[info_name] = json.dumps(info).encode(); self.files[report_name] = json.dumps(report).encode()
+                    (self.input / info_name).write_bytes(self.files[info_name]); (self.input / report_name).write_bytes(self.files[report_name])
+                self.write_checksums(); self.output = self.root / ('invalid-digest-' + str(invalid))
+                with self.subTest(invalid=invalid), self.assertRaises(ValueError): self.prepare()
+            self.files = baseline
+            for name, data in self.files.items(): (self.input / name).write_bytes(data)
+            self.write_checksums()
 
     def test_archive_and_manifest_are_deterministic_despite_mtime_and_permission_changes(self):
         first = self.prepare()

@@ -1,5 +1,18 @@
 """Named acceptance requirements shared by the native smoke and release gate."""
 
+
+V04_GUI_CHECKS = frozenset((
+    "appearance dark/light/system", "appearance persisted",
+    "appearance preserves document and viewport", "appearance document/export colors",
+    "appearance dialogs and icons",
+))
+
+V05_GUI_CHECKS = frozenset((
+    "objects select/move/duplicate/delete/undo", "objects text/image/stamp/symbol PDF roundtrip",
+    "objects bundled font and Unicode", "asynchronous text search", "images to PDF and undo",
+    "local OCR searchable text and preserved image",
+))
+
 V06_CORE_CHECKS = frozenset((
     "test_aes256_and_image_compression_runtime",
     "test_acroform_fill_export_reopen_runtime",
