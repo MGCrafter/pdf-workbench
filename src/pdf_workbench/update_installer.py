@@ -23,7 +23,7 @@ import unicodedata
 from uuid import uuid4
 import zipfile
 
-from .updates import DownloadedUpdate, UpdateError, _cancel, native_platform, version_tuple
+from .updates import DownloadedUpdate, UpdateError, _cancel, native_platform, validate_runtime_directory, version_tuple
 
 MANIFEST = "BUNDLE-MANIFEST.json"
 MAX_FILES = 20_000
@@ -136,6 +136,7 @@ def _copy_member(stream,target,size,cancel):
 def extract_update(downloaded:DownloadedUpdate,cancel=None):
     _cancel(cancel)
     release,archive=downloaded.release,Path(downloaded.archive)
+    validate_runtime_directory(archive.absolute().parent,release.platform)
     if (_link(archive) or archive.name!=release.asset.name or not archive.is_file() or archive.stat().st_size!=release.asset.size
             or _digest(archive,cancel)!=release.asset.sha256):raise UpdateError("Das heruntergeladene Paket wurde nach der Prüfung verändert.")
     root=Path(tempfile.mkdtemp(prefix="unpacked-",dir=archive.parent));kinds={};spellings={};entries=set();total=0;count=0
@@ -242,6 +243,8 @@ def prepare_install(downloaded,install_dir=None,*,restart_args=(),cancel=None):
     if _link(target) or target.resolve()!=Path(sys.executable).resolve().parent:raise UpdateError("Nur der tatsächlich gestartete portable Programmordner kann aktualisiert werden.")
     platform_name=native_platform()
     if downloaded.release.platform!=platform_name:raise UpdateError("Das Update passt nicht zum laufenden Programm.")
+    validate_runtime_directory(target,platform_name)
+    validate_runtime_directory(Path(downloaded.archive).absolute().parent,platform_name)
     old=validate_bundle(target,allow_foreign=True,cancel=cancel)
     from . import __version__
     if old["app_version"]!=__version__:raise UpdateError("Der Dateinachweis gehört nicht zur laufenden Programmversion.")
@@ -307,6 +310,7 @@ def load_plan(path,token):
                 or plan.platform not in ("windows","linux") or version_tuple(plan.new_version)<=version_tuple(plan.old_version)
                 or not re.fullmatch(r"[a-f0-9]{64}",plan.old_manifest_sha256)):raise ValueError
         target,candidate,backup,helper=(Path(value) for value in (plan.install_dir,plan.candidate_dir,plan.backup_dir,plan.helper_dir))
+        for directory in (target,candidate,backup,helper,path.parent):validate_runtime_directory(directory,plan.platform)
         if (any(not item.is_absolute() or _link(item) for item in (target,candidate,backup,helper))
                 or candidate.parent!=target.parent or backup.parent!=target.parent
                 or not candidate.name.startswith(f".{target.name}.update-") or not backup.name.startswith(f".{target.name}.backup-")
@@ -317,6 +321,8 @@ def load_plan(path,token):
 
 
 def launch_install(plan,old_pid=None):
+    for value in (plan.install_dir,plan.candidate_dir,plan.backup_dir,plan.helper_dir,Path(plan.plan_path).parent):
+        validate_runtime_directory(value,plan.platform)
     plan=replace(plan,old_pid=os.getpid() if old_pid is None else old_pid)
     if type(plan.old_pid) is not int or plan.old_pid<=0:raise UpdateError("Der alte Programmprozess ist ungültig.")
     _write_json(Path(plan.plan_path),asdict(plan));load_plan(plan.plan_path,plan.token)

@@ -25,7 +25,7 @@ class BundleLinkTests(unittest.TestCase):
         directory = self.bundle / '_internal'; directory.mkdir()
         native = directory / 'actual.so'; native.write_bytes(b'Native library fixture'); native.chmod(0o755)
         alias = directory / 'alias.so'; self.link(alias, native.name)
-        second = self.bundle / 'root-alias.so'; self.link(second, '_internal/alias.so')
+        second = self.bundle / 'root-alias.so'; self.link(second, Path('_internal') / 'alias.so')
         materialize_bundle_links(self.bundle)
         for path in (alias, second):
             self.assertFalse(path.is_symlink()); self.assertEqual(path.read_bytes(), native.read_bytes())

@@ -1,5 +1,5 @@
 """Archive containment, user-file preservation and real start/rollback swaps."""
-from dataclasses import replace
+from dataclasses import asdict,replace
 import hashlib,io,json,os
 from pathlib import Path
 import shutil,stat,subprocess,sys,tarfile,tempfile,time,unittest,zipfile
@@ -136,6 +136,30 @@ class InstallerTests(unittest.TestCase):
         new=bundle(self.root/"publisher","0.8.0");download=archive(new)
         with patch.object(sys,"frozen",False,create=True),self.assertRaisesRegex(UpdateError,"Quellcode"):
             prepare_install(download)
+
+    def test_windows_semicolon_install_cache_and_launch_fail_without_changing_originals(self):
+        old=bundle(self.root/"Install Ä; eigener Ordner","0.7.99");original=old/"Dokument; Ä.pdfwb";original.write_bytes(b"PRESERVE USER DATA")
+        before=(old/MANIFEST).read_bytes();new=bundle(self.root/"publisher","0.8.0");download=archive(new,"windows")
+        with patch.object(sys,"frozen",True,create=True),patch.object(sys,"executable",str(old/"PDFWorkbench")),patch("pdf_workbench.update_installer.native_platform",return_value="windows"),patch("pdf_workbench.update_installer.extract_update") as extract:
+            with self.assertRaisesRegex(UpdateError,"Semikolon"):prepare_install(download)
+            extract.assert_not_called()
+        self.assertEqual((old/MANIFEST).read_bytes(),before);self.assertEqual(original.read_bytes(),b"PRESERVE USER DATA")
+        cache=self.root/"Cache; Ä";cache.mkdir();cached=archive(new,"windows",cache)
+        with self.assertRaisesRegex(UpdateError,"Semikolon"):extract_update(cached)
+        self.assertFalse(list(cache.glob("unpacked-*")))
+        plan_path=self.root/"install-plan.json";plan_path.write_bytes(b"UNCHANGED PLAN")
+        plan=InstallPlan(str(plan_path),"a"*64,str(old),str(self.root/".Install.update-test"),str(cache),str(self.root/".Install.backup-test"),"0"*64,"0.7.99","0.8.0","windows",(str(original),))
+        with patch("pdf_workbench.update_installer.subprocess.Popen") as popen:
+            with self.assertRaisesRegex(UpdateError,"Semikolon"):launch_install(plan)
+            popen.assert_not_called()
+        self.assertEqual(plan_path.read_bytes(),b"UNCHANGED PLAN");self.assertEqual(original.read_bytes(),b"PRESERVE USER DATA")
+        # The restriction does not apply to documents or otherwise valid
+        # Unicode/space/$() runtime directories.
+        target=self.root/"App Ä $(literal)";helper=self.root/"Helper Ä $(literal)"
+        good=replace(plan,install_dir=str(target),candidate_dir=str(target.with_name('.'+target.name+'.update-test')),
+                     backup_dir=str(target.with_name('.'+target.name+'.backup-test')),helper_dir=str(helper))
+        plan_path.write_text(json.dumps(asdict(good)),encoding="utf-8")
+        self.assertEqual(load_plan(plan_path,good.token).restart_args,(str(original),))
 
     @unittest.skipIf(os.name=="nt","POSIX probe fixture")
     def test_foreign_collision_and_changed_old_manifest_abort_before_swap(self):

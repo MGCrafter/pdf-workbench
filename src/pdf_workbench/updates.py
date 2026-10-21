@@ -47,6 +47,17 @@ def native_platform() -> str:
     return system
 
 
+def validate_runtime_directory(path, platform_name):
+    """Reject the measured Windows bootloader PATH-list boundary only.
+
+    This concerns executable/runtime directories, never PDF/project filenames.
+    Unicode, spaces and shell metacharacters other than ';' remain valid.
+    """
+    if platform_name == "windows" and ";" in str(Path(path).expanduser().absolute()):
+        raise UpdateError("Das portable Windows-Programm kann aus Ordnerpfaden mit einem Semikolon (;) nicht zuverlässig starten. "
+                          "Bitte Programm und Update-Cache in einen Ordner ohne Semikolon verschieben. Ihre Dateien bleiben erhalten.")
+
+
 def should_check(last_checked, now=None) -> bool:
     now = time.time() if now is None else now
     try:
@@ -192,6 +203,8 @@ def _verify_checksums(data, release):
 
 def download_update(release: UpdateRelease, cache_dir, cancel=None, progress=None) -> DownloadedUpdate:
     if release.platform != native_platform(): raise UpdateError("Dieses Updatepaket passt nicht zum laufenden System.")
+    cache = Path(cache_dir).expanduser().resolve()
+    validate_runtime_directory(cache, release.platform)
     version_tuple(release.version)
     expected_name=f"PDFWorkbench-v{release.version}-{release.platform}-x86_64"+(".zip" if release.platform=="windows" else ".tar.gz")
     metadata=[{"name":asset.name,"browser_download_url":asset.url,"size":asset.size,"digest":"sha256:"+asset.sha256,"state":"uploaded"} for asset in (release.asset,release.checksums)]
@@ -199,7 +212,7 @@ def download_update(release: UpdateRelease, cache_dir, cancel=None, progress=Non
             or _asset(metadata,"SHA256SUMS",release.version,MAX_CHECKSUMS)!=release.checksums):
         raise UpdateError("Die Updateangaben gehören nicht zum erwarteten Release.")
     _verify_checksums(_read(release.checksums.url,MAX_CHECKSUMS,cancel),release)
-    cache = Path(cache_dir).expanduser().resolve(); cache.mkdir(parents=True,exist_ok=True)
+    cache.mkdir(parents=True,exist_ok=True)
     for previous in cache.glob("pdf-workbench-update-*/"+release.asset.name):
         _cancel(cancel)
         if previous.is_symlink() or not previous.is_file() or previous.stat().st_size!=release.asset.size:continue

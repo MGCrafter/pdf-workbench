@@ -75,5 +75,16 @@ class UpdateTests(unittest.TestCase):
     def test_daily_check_clock_and_disabled_preference_are_separate(self):
         self.assertTrue(should_check(None,100000));self.assertTrue(should_check("invalid",100000));self.assertFalse(should_check(99999,100000));self.assertTrue(should_check(1000,100000));self.assertTrue(should_check(float("nan"),100000));self.assertTrue(should_check(200000,100000))
 
+    def test_windows_cache_semicolon_fails_before_network_and_keeps_user_bytes(self):
+        data,checksums=metadata(target="windows");release=release_from_metadata(data,"0.7.99","windows")
+        cache=self.root/"Eigene Ä; Daten";cache.mkdir();original=cache/"Projekt; geschützt.pdfwb";original.write_bytes(b"ORIGINAL USER PROJECT")
+        with patch("pdf_workbench.updates.native_platform",return_value="windows"),patch("pdf_workbench.updates._open") as network:
+            with self.assertRaisesRegex(UpdateError,"Semikolon"):download_update(release,cache)
+            network.assert_not_called()
+        self.assertEqual(original.read_bytes(),b"ORIGINAL USER PROJECT");self.assertEqual(list(cache.iterdir()),[original])
+        allowed=self.root/"Eigene Ä Daten $(literal)"
+        with patch("pdf_workbench.updates.native_platform",return_value="windows"),patch("pdf_workbench.updates._open",side_effect=[Response(checksums),Response(b"archive")]):
+            self.assertEqual(download_update(release,allowed).archive.read_bytes(),b"archive")
+
 
 if __name__=="__main__":unittest.main()
