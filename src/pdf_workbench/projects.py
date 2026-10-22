@@ -360,16 +360,22 @@ def _commit_new(temporary, target):
         if error.errno not in (errno.EPERM,errno.EACCES,errno.ENOTSUP,errno.EOPNOTSUPP,errno.EXDEV): raise
         descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os,'O_BINARY',0) | getattr(os,'O_NOFOLLOW',0), 0o600)
         identity = None
+        written_size = 0; written_digest = hashlib.sha256()
         try:
             info = os.fstat(descriptor); identity = info.st_dev,info.st_ino
             with os.fdopen(descriptor,'wb') as output, temporary.open('rb') as source:
-                for chunk in iter(lambda:source.read(1024**2),b''): output.write(chunk)
+                for chunk in iter(lambda:source.read(1024**2),b''):
+                    count = output.write(chunk)
+                    written_size += count; written_digest.update(chunk[:count])
                 output.flush();os.fsync(output.fileno())
                 info = os.fstat(output.fileno())
                 return info.st_dev, info.st_ino
-        except BaseException:
+        except BaseException as failure:
             from .core import _discard_partial
-            _discard_partial(target, identity)
+            cleanup = _discard_partial(target, identity, expected_size=written_size,
+                                       expected_sha256=written_digest.hexdigest())
+            if cleanup and isinstance(failure, OSError):
+                raise OSError(failure.errno, str(failure) + cleanup) from failure
             raise
 
 

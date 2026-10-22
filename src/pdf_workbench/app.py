@@ -1077,7 +1077,8 @@ class MainWindow(DocumentTabs, WorkflowTools, AdvancedTools, WorkspaceSession, Q
         self.start_job(task, success)
 
     def confirm_discard(self, after_save=None):
-        return self._confirm_session_discard(after_save)
+        with self._suspend_autosave():
+            return self._confirm_session_discard(after_save)
 
     def new_workspace(self):
         if not self.job and self.confirm_discard(after_save=self.new_workspace):

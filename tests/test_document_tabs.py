@@ -203,6 +203,8 @@ class DocumentTabTests(unittest.TestCase):
         self.window._autosave_timer.setInterval(5)
         def discard(*args, **kwargs):
             self.assertFalse(self.window._autosave_timer.isActive())
+            QTimer.singleShot(1, self.window._session_changed)
+            QTimer.singleShot(2, self.window._autosave)
             loop = QEventLoop(); QTimer.singleShot(30, loop.quit); loop.exec()
             self.assertIsNone(self.window._autosave_job)
             return QMessageBox.StandardButton.Discard
@@ -211,6 +213,21 @@ class DocumentTabTests(unittest.TestCase):
         self.assertTrue(store.closed)
         self.assertEqual(len(self.window._document_tabs), 1)
         self.assertIsNone(self.window._autosave_job)
+
+    def test_cancelled_tab_close_resumes_autosave_after_late_modal_view_events(self):
+        self.window.enable_background_services(data_dir=self.root / "data", prompt_recovery=False, check_updates=False)
+        self.window.new_document_tab(); self.window.switch_document_tab(0)
+        self.window._autosave_timer.setInterval(5)
+        def cancel(*args, **kwargs):
+            QTimer.singleShot(1, self.window._session_changed)
+            QTimer.singleShot(2, self.window._autosave)
+            loop = QEventLoop(); QTimer.singleShot(30, loop.quit); loop.exec()
+            self.assertIsNone(self.window._autosave_job)
+            return QMessageBox.StandardButton.Cancel
+        with patch.object(QMessageBox, "question", side_effect=cancel): self.window.close_document_tab(0)
+        self.assertEqual(len(self.window._document_tabs), 2)
+        self.assertEqual(self.window._autosave_suppression, 0)
+        self.assertTrue(self.window._autosave_timer.isActive())
 
 
 if __name__ == "__main__": unittest.main()

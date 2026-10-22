@@ -1,6 +1,7 @@
 """Persistence acceptance: embedded originals, complete Undo, corruption and safe saves."""
 from dataclasses import replace
 import hashlib
+import errno
 import io
 import json
 import os
@@ -64,6 +65,23 @@ class ProjectTests(unittest.TestCase):
         out=self.root/'export.pdf';export_pdf(restored.sources,restored.pages,out,bookmarks=restored.bookmarks)
         self.assertEqual(len(PdfReader(out).pages),2);self.assertEqual(PdfReader(out).outline[0].title,'Kapitel')
         self.assertEqual(len(restored.pages[0].annotations),1)
+
+    def test_project_fallback_io_failure_keeps_same_inode_foreign_edit(self):
+        path = self.root / 'foreign-edited.pdfwb'
+        real_sync = os.fsync
+        def sync(descriptor):
+            if path.exists():
+                opened, current = os.fstat(descriptor), path.stat()
+                if (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino):
+                    path.write_bytes(b'FOREIGN USER EDIT')
+                    raise OSError('simulated I/O failure after external edit')
+            return real_sync(descriptor)
+        with patch('pdf_workbench.projects.os.link', side_effect=OSError(errno.EXDEV, 'unsupported')), \
+                patch('pdf_workbench.projects.os.fsync', side_effect=sync):
+            with self.assertRaisesRegex(PdfWorkbenchError, 'fremde Datei bleibt erhalten'):
+                write_project(self.snapshot, path)
+        self.assertEqual(path.read_bytes(), b'FOREIGN USER EDIT')
+        self.assertEqual(self.original.read_bytes(), self.original_bytes)
 
     def test_form_values_and_image_assets_remain_editable_after_project_reopen(self):
         from PyQt6.QtCore import QByteArray,QBuffer,QIODevice

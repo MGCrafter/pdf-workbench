@@ -4,6 +4,7 @@ Background services are explicitly enabled by the application entry point, so
 embedded windows and test harnesses never inspect a user's recovery files.
 """
 from dataclasses import replace
+from contextlib import contextmanager
 from pathlib import Path
 import time
 
@@ -26,6 +27,7 @@ class WorkspaceSession:
         self._autosave_last_key = None; self._discard_recovery_pending = False
         self._update_check_job = None; self._update_release = None
         self._skip_discard_once = False; self._update_restart_plan = None; self._pending_update_plan = None
+        self._autosave_suppression = 0
         self._autosave_timer = QTimer(self); self._autosave_timer.setSingleShot(True)
         self._autosave_timer.setInterval(2500); self._autosave_timer.timeout.connect(self._autosave)
 
@@ -42,8 +44,19 @@ class WorkspaceSession:
             str(self._project_path) if self._project_path else None)
 
     def _session_changed(self):
+        if self._autosave_suppression: return
         if self._services_enabled and not self._closing_requested and self._project_snapshot() != self._autosave_last_key:
             self._autosave_timer.start()
+
+    @contextmanager
+    def _suspend_autosave(self):
+        """Modal event loops can deliver late view changes and timer callbacks."""
+        self._autosave_suppression += 1
+        self._autosave_timer.stop()
+        try: yield
+        finally:
+            self._autosave_suppression -= 1
+            if not self._autosave_suppression: self._session_changed()
 
     def enable_background_services(self, *, data_dir=None, prompt_recovery=True, check_updates=True):
         if self._services_enabled: return
@@ -64,6 +77,7 @@ class WorkspaceSession:
         else: self._autosave_timer.stop()
 
     def _autosave(self):
+        if self._autosave_suppression: return
         if not self._services_enabled or self._closing_requested or not self.autosave_action.isChecked() or not self._recovery_store: return
         if self.job is not None or self._autosave_job is not None:
             self._autosave_timer.start(); return
@@ -247,10 +261,11 @@ class WorkspaceSession:
         # A restart must never quietly drop a workspace, even after a PDF export.
         has_session = bool(self.workspace.pages or self.workspace.can_undo or self.workspace.can_redo)
         if has_session and (self._project_path is None or self._is_dirty()):
-            answer = QMessageBox.question(self, "Vor dem Update speichern?",
-                "Der Neustart schließt diesen Arbeitsbereich. Als Projekt speichern und danach automatisch wieder öffnen?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save)
+            with self._suspend_autosave():
+                answer = QMessageBox.question(self, "Vor dem Update speichern?",
+                    "Der Neustart schließt diesen Arbeitsbereich. Als Projekt speichern und danach automatisch wieder öffnen?",
+                    QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Save)
             if answer == QMessageBox.StandardButton.Save:
                 self.save_project(after_save=lambda: self._install_update(plan)); return
             if answer != QMessageBox.StandardButton.Discard:

@@ -7,6 +7,7 @@ input path nor an existing output can be overwritten, including through aliases.
 from __future__ import annotations
 
 import io
+import hashlib
 import math
 import os
 import stat
@@ -413,13 +414,29 @@ def _protect_destination(target: Path, sources: Mapping[str, SourceDocument]) ->
         raise PdfWorkbenchError("Eine Quelldatei darf nicht überschrieben werden. Wähle einen neuen Namen.")
 
 
-def _discard_partial(target: Path, identity: tuple[int, int] | None) -> str:
+def _discard_partial(target: Path, identity: tuple[int, int] | None, expected_data: bytes | None = None,
+                     *, expected_size: int | None = None, expected_sha256: str | None = None) -> str:
     """Clean up a fallback output only while it is still the file we opened."""
     try:
         current = target.lstat()
         if (identity is None or not identity[1] or not stat.S_ISREG(current.st_mode)
                 or (current.st_dev, current.st_ino) != identity):
             return f"\nDas Ziel wurde inzwischen verändert. Eine fremde Datei bleibt erhalten; der Verbleib der eigenen Teildatei ist unbekannt. Letzter Pfad: {target}"
+        if expected_data is None and (expected_size is None or expected_sha256 is None):
+            return f"\nDie Teildatei konnte nicht als unverändert bestätigt werden und bleibt erhalten: {target}"
+        if expected_data is not None or expected_sha256 is not None:
+            with target.open("rb") as stream:
+                opened = os.fstat(stream.fileno())
+                unchanged = (opened.st_dev, opened.st_ino) == identity
+                if expected_data is not None:
+                    unchanged = unchanged and stream.read(len(expected_data) + 1) == expected_data
+                else:
+                    unchanged = (unchanged and opened.st_size == expected_size
+                                 and hashlib.file_digest(stream, 'sha256').hexdigest() == expected_sha256)
+            after = target.lstat()
+            if (not unchanged or (after.st_dev, after.st_ino) != identity
+                    or after.st_mtime_ns != current.st_mtime_ns):
+                return f"\nDas Ziel wurde inzwischen verändert. Eine fremde Datei bleibt erhalten: {target}"
         target.unlink()
     except FileNotFoundError:
         return f"\nDas Ziel wurde inzwischen entfernt oder verschoben. Letzter Pfad der eigenen Teildatei: {target}"
@@ -556,6 +573,7 @@ def export_pdf(
     temporary: Path | None = None
     created_target = False
     created_identity = None
+    created_length = 0
     try:
         writer = _build_writer(sources, pages, target.stem, cancel, progress,bookmarks=bookmarks)
         data, report = _serialize_output(writer, optimization, password, cancel, progress)
@@ -602,7 +620,7 @@ def export_pdf(
                 with temporary.open("rb") as source_stream:
                     while chunk := source_stream.read(1024 * 1024):
                         _check_cancel(cancel)
-                        output.write(chunk)
+                        created_length += output.write(chunk)
                 output.flush()
                 os.fsync(output.fileno())
         if compression_report and report is not None:
@@ -611,7 +629,7 @@ def export_pdf(
             progress(100, "PDF gespeichert")
         return target
     except Exception as exc:
-        cleanup = _discard_partial(target, created_identity) if created_target else ""
+        cleanup = _discard_partial(target, created_identity, data[:created_length]) if created_target else ""
         if isinstance(exc, OperationCancelled):
             raise OperationCancelled(("Vorgang abgebrochen." if cleanup else str(exc)) + cleanup) from exc
         if isinstance(exc, (AnnotationError, PdfWorkbenchError)):

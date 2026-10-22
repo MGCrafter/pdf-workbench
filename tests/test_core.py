@@ -185,6 +185,19 @@ class CoreTests(unittest.TestCase):
         self.assertFalse(self.out.exists())
         self.assertFalse(list(self.directory.glob(".pdf-workbench-*")))
 
+    def test_cancel_during_fallback_preserves_foreign_edit_at_same_inode(self):
+        target = self.directory / 'edited-in-place.pdf'
+        def progress(value, message):
+            if value == 100:
+                target.write_bytes(b'foreign in-place edit')
+                raise OperationCancelled('Vorgang abgebrochen.')
+        with patch('pdf_workbench.core.os.link', side_effect=OSError('unsupported')):
+            with self.assertRaisesRegex(OperationCancelled, 'fremde Datei bleibt erhalten'):
+                self.export(path=target, progress=progress)
+        self.assertEqual(target.read_bytes(), b'foreign in-place edit')
+        self.assertEqual(self.a.read_bytes(), self.original_a)
+        self.assertFalse(list(self.directory.glob('.pdf-workbench-*')))
+
     def test_source_rotation_crop_and_size_preserved(self):
         writer = PdfWriter()
         page = writer.add_page(PdfReader(self.a).pages[0])

@@ -325,6 +325,7 @@ class DocumentTabs:
             context.zoom_mode, context.zoom_factor, str(path) if path else None)
 
     def _session_changed(self):
+        if self._autosave_suppression: return
         if not hasattr(self, "_document_tabs"): return super()._session_changed()
         self._capture_document_tab()
         if not self._services_enabled or self._closing_requested: return
@@ -335,6 +336,7 @@ class DocumentTabs:
                     self._autosave_timer.start(); return
 
     def _autosave(self):
+        if self._autosave_suppression: return
         if not hasattr(self, "_document_tabs") or len(self._document_tabs) == 1:
             return super()._autosave()
         if not self._services_enabled or self._closing_requested or not self.autosave_action.isChecked(): return
@@ -397,10 +399,11 @@ class DocumentTabs:
             if (not has_session or self._update_discarded_tabs.get(context.uid) == context.workspace.snapshot()
                     or (context.session.get("_project_path") is not None and not self._tab_dirty(context))): continue
             self.switch_document_tab(index)
-            answer = QMessageBox.question(self, "Dokument-Tabs vor dem Update speichern?",
-                f"Tab {index + 1} enthält einen ungespeicherten Arbeitsbereich. Als Projekt speichern und nach dem Neustart wieder öffnen?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save)
+            with self._suspend_autosave():
+                answer = QMessageBox.question(self, "Dokument-Tabs vor dem Update speichern?",
+                    f"Tab {index + 1} enthält einen ungespeicherten Arbeitsbereich. Als Projekt speichern und nach dem Neustart wieder öffnen?",
+                    QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Save)
             if answer == QMessageBox.StandardButton.Save:
                 self.save_project(after_save=lambda: self._install_update(plan))
                 if self.job is None: self._update_discarded_tabs.clear()
