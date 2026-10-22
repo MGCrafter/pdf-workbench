@@ -19,6 +19,8 @@ jobs:
           - os: windows-2022
             platform: windows
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,26 +46,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 build-essential pkg-config libffi-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev libwebp-dev libharfbuzz-dev libfribidi-dev libraqm-dev
-      - name: Prepare optional OCR engine for native Windows acceptance
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          # Pinned UB-Mannheim build, SHA-256 recorded in Microsoft's WinGet manifest.
-          # This engine is used by acceptance tests and is not added to the app bundle.
-          $installer = Join-Path $env:RUNNER_TEMP 'tesseract-5.4.0.20240606.exe'
-          Invoke-WebRequest -Uri 'https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe' -OutFile $installer
-          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne 'C885FFF6998E0608BA4BB8AB51436E1C6775C2BAFC2559A19B423E18678B60C9') { throw 'OCR installer checksum mismatch' }
-          $process = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw 'OCR acceptance engine setup failed' }
-          $engine = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'
-          if (-not (Test-Path -LiteralPath $engine)) { throw 'OCR acceptance engine is missing' }
-          & $engine --version
-          if ($LASTEXITCODE -ne 0) { throw 'OCR acceptance engine cannot run' }
-          (Split-Path -Parent $engine) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils ghostscript tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-osd libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 build-essential pkg-config libxml2-dev libxslt1-dev libffi-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev libwebp-dev libharfbuzz-dev libfribidi-dev libraqm-dev
+      - uses: ./.github/actions/acceptance-tools
       - name: Install Linux runtime with system image libraries
         if: runner.os == 'Linux'
-        run: python -m pip install --no-binary=Pillow,cffi -r packaging/requirements-release.txt
+        run: python -m pip install --no-binary=Pillow,cffi,lxml -r packaging/requirements-release.txt
       - name: Install Windows runtime
         if: runner.os == 'Windows'
         run: python -m pip install -r packaging/requirements-release.txt
@@ -120,6 +107,16 @@ jobs:
             Get-ChildItem -LiteralPath $out -Filter test.log -Recurse | ForEach-Object { Get-Content -LiteralPath $_.FullName }
             throw 'Frozen Windows acceptance failed'
           }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: frozen-acceptance-${{ matrix.platform }}
+          path: |
+            build/frozen-smoke/**/result.json
+            build/frozen-smoke/**/test.log
+            build/frozen-smoke/**/*.xml
+          if-no-files-found: warn
+          retention-days: 7
       - name: Package the tested app
         run: python packaging/release.py --bundle dist/PDFWorkbench --notices build/release-notices --test-results build/frozen-smoke --output release-assets
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -151,8 +148,8 @@ jobs:
       - name: Prepare image source build
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config libffi-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev libwebp-dev libharfbuzz-dev libfribidi-dev libraqm-dev
-      - run: python -m pip install --no-binary=Pillow,cffi -r packaging/requirements-release.txt
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libxml2-dev libxslt1-dev libffi-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev libwebp-dev libharfbuzz-dev libfribidi-dev libraqm-dev
+      - run: python -m pip install --no-binary=Pillow,cffi,lxml -r packaging/requirements-release.txt
       - run: python -m pip uninstall --yes reportlab
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

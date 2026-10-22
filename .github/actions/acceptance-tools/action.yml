@@ -1,0 +1,20 @@
+name: Native acceptance tools
+description: Verified cached OCR and PDF/A tools, used only by acceptance tests
+runs:
+  using: composite
+  steps:
+    - name: Restore original verified tool downloads
+      id: downloads
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ runner.tool_cache }}/pdfwb-acceptance-downloads
+        key: acceptance-tools-v1-${{ runner.os }}-${{ hashFiles('packaging/acceptance_tools.py') }}
+    - name: Prepare actual OCR and PDF/A tools
+      shell: bash
+      run: python packaging/acceptance_tools.py --cache "${{ runner.tool_cache }}/pdfwb-acceptance-downloads" --output "${{ runner.temp }}/pdfwb-acceptance-tools"
+    - name: Retain verified original downloads before acceptance
+      if: steps.downloads.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ runner.tool_cache }}/pdfwb-acceptance-downloads
+        key: ${{ steps.downloads.outputs.cache-primary-key }}

@@ -229,7 +229,10 @@ class Acceptance(unittest.TestCase):
 
     def test_pdfa_requires_actual_validator_and_preserves_order_orientation(self):
         from pdf_workbench.pdfa import export_pdfa, validate_pdfa
-        if not self.verapdf or not self.ghostscript: self.skipTest("Actual local Ghostscript/veraPDF not supplied")
+        if not self.verapdf or not self.ghostscript:
+            if os.environ.get("PDF_WORKBENCH_REQUIRE_PDFA") == "1":
+                self.fail("Actual Ghostscript and veraPDF are mandatory for this acceptance run")
+            self.skipTest("Actual local Ghostscript/veraPDF not supplied")
         first, second = self.ws.pages; self.ws.reorder([second.uid, first.uid]); self.ws.rotate([second.uid], 90)
         out = self.directory / "archive.pdf"
         result = export_pdfa(self.ws.sources, self.ws.pages, out, verapdf=self.verapdf, ghostscript=self.ghostscript)

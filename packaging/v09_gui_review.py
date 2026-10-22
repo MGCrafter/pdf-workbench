@@ -217,6 +217,8 @@ def v09_acceptance(window, directory, app, wait_for, fixture, *, verapdf=None, g
             complete(); assert archive.exists()
             checks.append('native PDF/A dialog and actual Ghostscript plus veraPDF validated export')
         else:
+            if os.environ.get('PDF_WORKBENCH_REQUIRE_PDFA') == '1':
+                raise AssertionError('Actual Ghostscript and veraPDF are mandatory for native PDF/A acceptance')
             dialog = PdfaDialog(window); dialog.paths[0].setText(str(outdir / 'missing-gs')); dialog.paths[1].setText(str(outdir / 'missing-validator'))
             dialog.accept(); assert dialog.request is None and dialog.status.text(); snapshot(dialog, 'pdfa-missing'); dialog.reject(); dialog.deleteLater()
             checks.append('PDF/A missing external tools guard shown; conversion not exercised here')
