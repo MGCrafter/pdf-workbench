@@ -4,15 +4,20 @@ PDFs zusammenfügen, Seiten sortieren und schnell etwas dazuschreiben.
 PDF Workbench ist eine freie Desktop-App für Windows und Linux. Sie arbeitet
 lokal, ohne Konto und ohne Upload deiner Dokumente.
 
-**Version 0.8.0** ergänzt Lesezeichen, Zuschneiden und Seitenformate,
-speicherbare Projekte mit automatischer Sicherung sowie einen integrierten Updater.
+**Version 0.9.0** ergänzt getrennte
+Dokument-Tabs mit Seitenübertragung, Stapelvorlagen, Scan-Aufbereitung,
+Prüfung leerer/doppelter Seiten, Vorder-/Rückseiten-Sortierung, Bild-/Textexport,
+klickbare Inhaltsverzeichnisse und interne Links. Dazu kommen dauerhafte
+Schwärzung als neue Bild-PDF, begrenzte Bearbeitung bestehenden PDF-Texts,
+Offline-Zertifikatssignaturen und mit veraPDF validierter PDF/A-2b-Export.
+Bedienung und Grenzen stehen in [Ausbau 0.9](docs/v09-development.md).
 
 ## Download
 
-| System | Download für v0.8.0 |
+| System | Download für v0.9.0 |
 | --- | --- |
-| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.8.0/PDFWorkbench-v0.8.0-windows-x86_64.zip) |
-| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.8.0/PDFWorkbench-v0.8.0-linux-x86_64.tar.gz) |
+| Windows 64-Bit | [ZIP herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.9.0/PDFWorkbench-v0.9.0-windows-x86_64.zip) |
+| Linux 64-Bit | [tar.gz herunterladen](https://github.com/MGCrafter/pdf-workbench/releases/download/v0.9.0/PDFWorkbench-v0.9.0-linux-x86_64.tar.gz) |
 
 Alle Versionen, Prüfsummen und Hinweise zu den Paketen findest du unter
 [Releases](https://github.com/MGCrafter/pdf-workbench/releases).
@@ -29,7 +34,7 @@ Umlaute und Leerzeichen funktionieren.
 **Linux:** Das Archiv entpacken und die App starten:
 
 ```sh
-tar -xzf PDFWorkbench-v0.8.0-linux-x86_64.tar.gz
+tar -xzf PDFWorkbench-v0.9.0-linux-x86_64.tar.gz
 cd PDFWorkbench
 ./PDFWorkbench
 ```
@@ -61,6 +66,14 @@ Linux-Distributionen stehen in den jeweiligen Release-Hinweisen.
 - Den gesamten Arbeitsbereich als `.pdfwb`-Projekt speichern, inklusive eingebetteter
   PDFs, eigener Objekte, Lesezeichen und Undo-/Redo-Historie; automatische lokale Sicherungen.
 - Neue Programmversionen täglich prüfen und nach Bestätigung herunterladen und installieren.
+- Mehrere Dokumente in getrennten Tabs bearbeiten und Seiten zwischen Tabs übertragen.
+- Stapelvorlagen für wiederkehrende Aufgaben speichern und austauschen.
+- Scans aufbereiten, leere/doppelte Seiten manuell prüfen und Duplexscans sortieren.
+- Seiten als PNG/JPEG und auslesbaren Text als UTF-8 exportieren.
+- Klickbare Inhaltsverzeichnisse und interne Linkbereiche für den Export erstellen.
+- Einfache vorhandene Textabschnitte ersetzen und sensible Bereiche dauerhaft schwärzen.
+- Neue PDFs mit eigenem PFX/P12-Zertifikat signieren und Originalsignaturen offline prüfen.
+- PDF/A-2b mit lokalem Ghostscript erzeugen und vor dem Speichern mit veraPDF validieren.
 
 ## Loslegen
 
@@ -118,6 +131,9 @@ Originalfarben.
 
 Die App richtet sich an normale Dokumentseiten. Gezeichnete Unterschriften
 sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
+Für kryptografische Signaturen gibt es einen getrennten PFX/P12-Befehl.
+Bearbeitung und normaler Neu-Export erhalten vorhandene Zertifikatssignaturen
+nicht gültig; die Offline-Prüfung verwendet deshalb die unveränderte Datei.
 
 - PDFs mit Öffnungspasswort lassen sich entsperren und als neue Datei mit
   AES-256 schützen. Normale Exporte, Einzelseiten und OCR bleiben unverschlüsselt.
@@ -138,13 +154,21 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 - Bildkomprimierung kann Details verlieren; spezielle Bildformate und Masken
   bleiben unverändert. Es gibt keine garantierte Größenersparnis.
 - Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
-  sie für Scans ergänzen. Bestehender PDF-Text lässt sich nicht direkt ändern;
-  neue Textfelder sind eigene Objekte.
+  sie für Scans ergänzen. Ab 0.9 lassen sich unterstützte bestehende Textabschnitte
+  ersetzen; komplexe Schriften und Layouts werden abgewiesen. Neue Textfelder
+  bleiben eigene Objekte.
 - Sichere Lesezeichen auf enthaltene Seiten werden übernommen. Externe Aktionen,
   Skripte und genaue ursprüngliche Zoompositionen werden nicht kopiert. Anhänge,
-  dokumentweite Metadaten und Tags werden nicht übernommen; PDF/A ist nicht garantiert.
+  dokumentweite Metadaten und Tags werden nicht übernommen. Normale Exporte
+  prüfen keine PDF/A-Konformität.
 - Zuschneiden blendet Inhalte aus und ist **keine sichere Schwärzung**. Angeschnittene
   eigene Objekte können zu normalen PDF-Anmerkungen ohne Workbench-Bearbeitungsgriffe werden.
+- Dauerhafte Schwärzung erzeugt eine neue Bild-PDF ohne ursprüngliche Textschicht
+  oder Interaktivität. Originale, Projekte und Sicherungen enthalten weiterhin
+  die ungeschwärzten Informationen. Scan-Aufbereitung wandelt Seiten ebenfalls in Bilder um.
+- PDF/A-2b erfordert eigene lokale Installationen von Ghostscript, veraPDF und Java.
+  Die Konvertierung kann Formulare verflachen und das Aussehen verändern;
+  nur der ausdrücklich validierte PDF/A-Export prüft die Konformität.
 - Vorhandene Seitenanmerkungen werden übernommen. Interne Verweise auf entfernte
   oder umsortierte Seiten sind nicht vollständig unterstützt.
 
@@ -154,7 +178,7 @@ getestet werden, steht unter [Tests](docs/testing.md).
 ## Aus dem Quellcode starten
 
 Benötigt wird Python 3.11 oder neuer. Die Installation übernimmt PyQt6, pypdf,
-Pillow und cryptography. Im Projektordner:
+Pillow, cryptography, PyMuPDF und pyHanko samt Abhängigkeiten. Im Projektordner:
 
 **Linux:**
 

@@ -1,0 +1,4 @@
+# Build backends are tools, separate from the packaged application runtime.
+# Keep source metadata/builds reproducible across fresh hosted runners.
+setuptools==84.0.0
+pybind11==3.1.0

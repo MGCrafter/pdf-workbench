@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import shutil
@@ -13,6 +14,12 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def release_distributions():
+    spec = importlib.util.spec_from_file_location('pdf_workbench_release_dependencies', ROOT / 'packaging/release_dependencies.py')
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    return module.release_distributions()
 
 
 def materialize_bundle_links(bundle: Path) -> None:
@@ -75,8 +82,7 @@ def verify_notices(directory: Path) -> dict:
     if manifest.get('schema_version') != 1 or manifest.get('complete') is not True or not manifest.get('files'):
         raise ValueError('Release notices are incomplete; run packaging/collect_notices.py first.')
     from PyQt6.QtCore import qVersion
-    versions = {'Qt': qVersion(), **{name: importlib.metadata.version(name) for name in
-                ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography', 'cffi')}}
+    versions = {'Qt': qVersion(), **{name: importlib.metadata.version(name) for name in release_distributions()}}
     for name, version in versions.items():
         if manifest.get('versions', {}).get(name) != version:
             raise ValueError(f'Notices describe a different {name} version.')
@@ -119,6 +125,10 @@ def main():
         '--copy-metadata', 'pypdf', '--copy-metadata', 'PyQt6',
         '--copy-metadata', 'Pillow', '--copy-metadata', 'cryptography',
         '--copy-metadata', 'cffi',
+        '--copy-metadata', 'PyMuPDF', '--copy-metadata', 'pyHanko',
+        '--copy-metadata', 'pyhanko-certvalidator',
+        '--collect-all', 'pymupdf', '--collect-all', 'pyhanko',
+        '--collect-all', 'pyhanko_certvalidator', '--collect-all', 'tzdata',
         '--exclude-module', 'PIL.AvifImagePlugin', '--exclude-module', 'PIL._avif',
         '--add-data', f'{ROOT / "LICENSE"}:.',
         '--add-data', f'{ROOT / "THIRD_PARTY_NOTICES.md"}:.',

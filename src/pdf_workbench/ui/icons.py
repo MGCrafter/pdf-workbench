@@ -39,7 +39,9 @@ class VectorIcon(QIconEngine):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         p = QPainterPath()
         name = self.name
-        if name in ("up", "down"):
+        if name == "close":
+            p.moveTo(7, 7); p.lineTo(17, 17); p.moveTo(17, 7); p.lineTo(7, 17)
+        elif name in ("up", "down"):
             if name == "down":
                 painter.translate(24, 24); painter.rotate(180)
             p.moveTo(12, 20); p.lineTo(12, 4); p.moveTo(5, 11); p.lineTo(12, 4); p.lineTo(19, 11)

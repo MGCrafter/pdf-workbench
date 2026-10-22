@@ -4,6 +4,7 @@ Background services are explicitly enabled by the application entry point, so
 embedded windows and test harnesses never inspect a user's recovery files.
 """
 from dataclasses import replace
+from contextlib import contextmanager
 from pathlib import Path
 import time
 
@@ -26,6 +27,7 @@ class WorkspaceSession:
         self._autosave_last_key = None; self._discard_recovery_pending = False
         self._update_check_job = None; self._update_release = None
         self._skip_discard_once = False; self._update_restart_plan = None; self._pending_update_plan = None
+        self._autosave_suppression = 0
         self._autosave_timer = QTimer(self); self._autosave_timer.setSingleShot(True)
         self._autosave_timer.setInterval(2500); self._autosave_timer.timeout.connect(self._autosave)
 
@@ -42,8 +44,19 @@ class WorkspaceSession:
             str(self._project_path) if self._project_path else None)
 
     def _session_changed(self):
+        if self._autosave_suppression: return
         if self._services_enabled and not self._closing_requested and self._project_snapshot() != self._autosave_last_key:
             self._autosave_timer.start()
+
+    @contextmanager
+    def _suspend_autosave(self):
+        """Modal event loops can deliver late view changes and timer callbacks."""
+        self._autosave_suppression += 1
+        self._autosave_timer.stop()
+        try: yield
+        finally:
+            self._autosave_suppression -= 1
+            if not self._autosave_suppression: self._session_changed()
 
     def enable_background_services(self, *, data_dir=None, prompt_recovery=True, check_updates=True):
         if self._services_enabled: return
@@ -64,6 +77,7 @@ class WorkspaceSession:
         else: self._autosave_timer.stop()
 
     def _autosave(self):
+        if self._autosave_suppression: return
         if not self._services_enabled or self._closing_requested or not self.autosave_action.isChecked() or not self._recovery_store: return
         if self.job is not None or self._autosave_job is not None:
             self._autosave_timer.start(); return
@@ -121,13 +135,13 @@ class WorkspaceSession:
             if after_save: self._after_job_callback = after_save
         self.start_job(task, success)
 
-    def open_project(self, checked=False, *, path=None, recovery=False, password=None, incorrect=False, confirmed=False):
+    def open_project(self, checked=False, *, path=None, recovery=False, password=None, incorrect=False, confirmed=False, after_open=None):
         if self.job or self._closing_requested: return
         if path is None:
             filename, _ = QFileDialog.getOpenFileName(self, "Projekt öffnen", "", "PDF-Workbench-Projekt (*.pdfwb)", options=file_dialog_options())
             if not filename: return
             path = Path(filename)
-        if not confirmed and not self.confirm_discard(after_save=lambda: self.open_project(path=path, recovery=recovery, confirmed=True)): return
+        if not confirmed and not self.confirm_discard(after_save=lambda: self.open_project(path=path, recovery=recovery, confirmed=True, after_open=after_open)): return
         def task(cancel, progress):
             try: return read_project(path, password=password, cancel=cancel)
             except (ProjectPasswordRequired, IncorrectProjectPassword) as error: return error
@@ -135,7 +149,7 @@ class WorkspaceSession:
             if isinstance(loaded, (ProjectPasswordRequired, IncorrectProjectPassword)):
                 def retry():
                     value = ProjectPasswordDialog.ask(self, filename=Path(path).name, incorrect=isinstance(loaded, IncorrectProjectPassword))
-                    if value is not None: self.open_project(path=path, recovery=recovery, password=value, confirmed=True)
+                    if value is not None: self.open_project(path=path, recovery=recovery, password=value, confirmed=True, after_open=after_open)
                 self._after_job_callback = retry; return
             state = loaded.snapshot
             self.workspace.restore_state(state.state)
@@ -152,6 +166,7 @@ class WorkspaceSession:
             else: self.preview.set_zoom(state.zoom_factor)
             self.set_status("Automatische Sicherung wiederhergestellt. Bitte als neues Projekt speichern." if recovery else f"Projekt geöffnet: {loaded.path}")
             if loaded.recovered_from: self.set_status(f"Vorige Projektversion wiederhergestellt: {loaded.recovered_from}. Bitte erneut speichern.", "warning")
+            if after_open: self._after_job_callback = after_open
         self.start_job(task, success)
 
     def recover_project(self):
@@ -246,10 +261,11 @@ class WorkspaceSession:
         # A restart must never quietly drop a workspace, even after a PDF export.
         has_session = bool(self.workspace.pages or self.workspace.can_undo or self.workspace.can_redo)
         if has_session and (self._project_path is None or self._is_dirty()):
-            answer = QMessageBox.question(self, "Vor dem Update speichern?",
-                "Der Neustart schließt diesen Arbeitsbereich. Als Projekt speichern und danach automatisch wieder öffnen?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save)
+            with self._suspend_autosave():
+                answer = QMessageBox.question(self, "Vor dem Update speichern?",
+                    "Der Neustart schließt diesen Arbeitsbereich. Als Projekt speichern und danach automatisch wieder öffnen?",
+                    QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Save)
             if answer == QMessageBox.StandardButton.Save:
                 self.save_project(after_save=lambda: self._install_update(plan)); return
             if answer != QMessageBox.StandardButton.Discard:

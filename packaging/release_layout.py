@@ -281,10 +281,9 @@ def prepare_assets(
     # require the complete feature report and its exact builder linkage here as
     # well, before uploading any archive. This never executes downloaded code.
     if tuple(map(int, tag[1:].split('.')[:2])) >= (0, 8):
-        from release_checks import (V04_GUI_CHECKS, V05_GUI_CHECKS, V06_CORE_CHECKS, V06_GUI_CHECKS,
-            V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS)
-        required_core = V06_CORE_CHECKS | V07_CORE_CHECKS | V08_CORE_CHECKS
-        required_gui = V04_GUI_CHECKS | V05_GUI_CHECKS | V06_GUI_CHECKS | V07_GUI_CHECKS | V08_GUI_CHECKS
+        from release_checks import required_core_checks, required_gui_checks, minimum_core_tests, minimum_gui_checks
+        required_core = required_core_checks(tag)
+        required_gui = required_gui_checks(tag)
         shared_source_hashes = None
         for platform_name in ('linux', 'windows'):
             info_path = paths.get(f'PDFWorkbench-{tag}-{platform_name}-BUILD-INFO.json')
@@ -305,10 +304,11 @@ def prepare_assets(
             if (report.get('result') != 'PASS' or report.get('frozen') is not True
                     or report.get('app_version') != tag[1:] or gui.get('app_version') != tag[1:]
                     or gui.get('result') != 'PASS' or gui.get('qt_platform') not in native_platforms
-                    or type(core.get('tests')) is not int or core['tests'] < 23
+                    or type(core.get('tests')) is not int or core['tests'] < minimum_core_tests(tag)
                     or core.get('failures') != 0 or core.get('errors') != 0 or core.get('skipped') != []
                     or not required_core <= set(core.get('checks', []))
                     or not required_gui <= set(gui.get('checks', []))
+                    or len(set(gui.get('checks', []))) < minimum_gui_checks(tag)
                     or accepted.get('core') != core or accepted.get('gui_checks') != gui.get('checks')
                     or accepted.get('qt_platform') != gui.get('qt_platform')
                     or provenance.get('source_commit') != source_commit

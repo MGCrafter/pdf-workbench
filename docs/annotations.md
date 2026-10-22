@@ -8,8 +8,10 @@ keine externen Schriftarten, Bilder oder zusätzlichen Dateien.
 
 Eine gezeichnete Unterschrift ist eine sichtbare Zeichnung. Sie ist keine
 kryptografische Zertifikatssignatur und bestätigt weder Identität noch
-Unverändertheit des Dokuments. PDFs mit digitalen Zertifikatssignaturen,
-interaktiven Formularfeldern oder Verschlüsselung werden weiterhin abgelehnt.
+Unverändertheit des Dokuments. Normale AcroForms und Öffnungspasswörter werden
+unterstützt; digitale Signaturfelder werden bei der allgemeinen Bearbeitung
+abgewiesen. Ab 0.9 gibt es getrennte Werkzeuge zum kryptografischen Signieren
+neuer Exporte und zur Prüfung unveränderter Dateien; siehe [Ausbau 0.9](v09-development.md).
 
 ## Bearbeiten und Wiederöffnen
 

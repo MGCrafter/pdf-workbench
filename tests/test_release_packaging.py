@@ -205,6 +205,38 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             report['core']['tests'] = 22; self.write_report(report)
             with self.assertRaises(ValueError): self.verify(target)
 
+    def test_v09_requires_new_cases_and_actual_native_pdfa_on_both_platforms(self):
+        self.version = self.provenance['app_version'] = '0.9.0'
+        for target, platform_name in (('linux', 'wayland'), ('win32', 'windows')):
+            report, _ = self.prepare(target, platform_name)
+            report['core'].update(tests=34, checks=sorted(release.required_core_checks(self.version)))
+            report['gui']['checks'] = sorted(release.required_gui_checks(self.version))
+            extras = [f'base native workflow {index}' for index in range(60 - len(report['gui']['checks']))]
+            report['gui']['checks'] += extras
+            self.write_report(report); self.assertEqual(self.verify(target), report)
+            for repeated in (False, True):
+                invalid = copy.deepcopy(report)
+                invalid['gui']['checks'].remove(extras[-1])
+                if repeated:
+                    invalid['gui']['checks'].append(invalid['gui']['checks'][0])
+                self.write_report(invalid)
+                with self.subTest(target=target, incomplete_gui=True, repeated=repeated), self.assertRaises(ValueError):
+                    self.verify(target)
+            for section, required in (('core', release.V09_CORE_CHECKS), ('gui', release.V09_GUI_CHECKS)):
+                for missing in required:
+                    invalid = copy.deepcopy(report); invalid[section]['checks'].remove(missing)
+                    self.write_report(invalid)
+                    with self.subTest(target=target, section=section, missing=missing), self.assertRaises(ValueError): self.verify(target)
+            for count, skips in ((23, []), (33, []), (34, [('PDF/A', 'tool absent')])):
+                invalid = copy.deepcopy(report); invalid['core'].update(tests=count, skipped=skips)
+                self.write_report(invalid)
+                with self.subTest(target=target, count=count, skips=skips), self.assertRaises(ValueError): self.verify(target)
+            invalid = copy.deepcopy(report)
+            invalid['gui']['checks'].remove('native PDF/A dialog and actual Ghostscript plus veraPDF validated export')
+            invalid['gui']['checks'].append('PDF/A missing external tools guard shown; conversion not exercised here')
+            self.write_report(invalid)
+            with self.assertRaises(ValueError): self.verify(target)
+
     def test_previous_build_cannot_be_released_as_a_different_checkout(self):
         self.prepare()
         identities = {

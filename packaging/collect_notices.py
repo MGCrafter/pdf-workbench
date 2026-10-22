@@ -34,6 +34,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 QT_VERSION = "6.11.2"
 LOCK = ROOT / "packaging/notices-lock.json"
+V09_LOCK = ROOT / "packaging/v09-notices-lock.json"
 # This verbatim GNU original is small, immutable release input. Keep its
 # canonical provenance and digest in the same reviewed lock as the Qt notices,
 # so a flaky license-document host cannot interrupt an otherwise complete build.
@@ -60,6 +61,12 @@ def runtime_wheels():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def release_distributions():
+    spec = importlib.util.spec_from_file_location("pdf_workbench_release_dependencies", ROOT / "packaging/release_dependencies.py")
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    return module.release_distributions()
 
 
 def merge_runtime_sources(sources: list[dict], inventories: list[dict]) -> list[dict]:
@@ -245,6 +252,33 @@ def fetch_runtime_notice(url: str, output: Path, lock: dict) -> bytes:
     return path.read_bytes()
 
 
+def copy_v09_locked_notices(output: Path) -> dict:
+    lock = json.loads(V09_LOCK.read_text(encoding="utf-8"))
+    expected_modules = {"brotli", "cmark-gfm", "curl", "extract", "freeglut", "freetype", "gumbo-parser", "harfbuzz", "jbig2dec", "lcms2", "leptonica", "libjpeg", "mujs", "openjpeg", "tesseract", "zint", "zlib", "zxing-cpp"}
+    if (lock.get("schema_version") != 1 or lock.get("pymupdf_version") != "1.28.2" or lock.get("mupdf_version") != "1.28.2"
+            or {item["path"].removeprefix("thirdparty/") for item in lock.get("mupdf_submodules", ())} != expected_modules
+            or lock.get("windows_lxml", {}).get("version") != "6.1.3"):
+        raise IncompleteNotices("Incomplete 0.9 native attribution/source lock")
+    files = lock.get("files", [])
+    paths = {item["path"] for item in files}
+    if len(files) < 102 or not {"licenses/upstream/v09/pymupdf-1.28.2/COPYING", "licenses/upstream/v09/mupdf-1.28.2/COPYING"} <= paths:
+        raise IncompleteNotices("Missing original AGPLv3/third-party notices for PyMuPDF/MuPDF")
+    for module in expected_modules:
+        if not any(path.startswith(f"licenses/upstream/v09/mupdf-1.28.2/thirdparty/{module}/") for path in paths):
+            raise IncompleteNotices("Missing locked MuPDF third-party original notices: "+module)
+    for item in files:
+        path = ROOT / safe_relative(item["path"])
+        if path.is_symlink() or not path.is_file() or sha256(path) != item["sha256"] or path.stat().st_size != item["size"]:
+            raise IncompleteNotices("Missing/modified locked 0.9 upstream notice: "+item["path"])
+        put(output, item["path"].removeprefix("licenses/"), path.read_bytes())
+    for name in ("pymupdf", "mupdf"):
+        text = (output / f"upstream/v09/{name}-1.28.2/COPYING").read_bytes()
+        if b"GNU AFFERO GENERAL PUBLIC LICENSE" not in text or len(text) < 30000:
+            raise IncompleteNotices("Full original AGPLv3 license text is missing")
+    put(output, "v09-upstream-lock.json", V09_LOCK.read_bytes())
+    return lock
+
+
 def normalized_name(value: str) -> str:
     return re.sub(r"[-_.]+", "-", value).lower()
 
@@ -260,7 +294,8 @@ def release_pins() -> dict[str, str]:
 
 def collect_distributions(output: Path) -> tuple[dict, list]:
     pins = release_pins()
-    required = {"pyqt6", "pyqt6-qt6", "pyqt6-sip", "pypdf", "pyinstaller", "pyinstaller-hooks-contrib", "pillow", "cryptography", "cffi", "pycparser"}
+    packages = release_distributions()
+    required = {normalized_name(name) for name in packages}
     versions, inventory = {}, []
     for dist in sorted(metadata.distributions(), key=lambda d: normalized_name(d.metadata.get("Name", ""))):
         name = dist.metadata.get("Name")
@@ -289,7 +324,7 @@ def collect_distributions(output: Path) -> tuple[dict, list]:
     if not required <= found:
         raise IncompleteNotices(f"Missing release distributions: {sorted(required-found)}")
     # Record predictable keys regardless of wheel metadata capitalization.
-    versions = {name: metadata.version(name) for name in ("PyQt6", "PyQt6-Qt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser")}
+    versions = {name: metadata.version(name) for name in packages}
     from PyQt6.QtCore import qVersion, PYQT_VERSION_STR
     versions.update({"Qt": qVersion(), "Python": platform.python_version()})
     if versions["Qt"] != QT_VERSION or PYQT_VERSION_STR != versions["PyQt6"]:
@@ -368,7 +403,8 @@ def collect_system_notices(output: Path) -> None:
 
 def source_archives(versions: dict, lock: dict) -> list[dict]:
     result = [dict(lock["qt_source_archive"])]
-    for package in ("PyQt6", "PyQt6-sip", "pypdf", "PyInstaller", "pyinstaller-hooks-contrib", "Pillow", "cryptography", "cffi", "pycparser"):
+    for package in release_distributions():
+        if normalized_name(package) == "pyqt6-qt6": continue  # Complete Qt source already supplied above.
         version = versions[package]
         data = json.loads(fetch(f"https://pypi.org/pypi/{package}/{version}/json"))
         sdists = [item for item in data["urls"] if item["packagetype"] == "sdist"]
@@ -609,6 +645,7 @@ def download_sources(items: list[dict], destination: Path) -> None:
             if item.get("size") is not None and item["size"] != actual_size:
                 raise IncompleteNotices(f"Source size mismatch: {filename}")
             item.update(sha256=expected, size=actual_size)
+            verify_source_members(path, item)
             continue
         if urllib.parse.urlparse(item["url"]).scheme != "https":
             raise IncompleteNotices("Source archive URL must use HTTPS")
@@ -654,12 +691,32 @@ def download_sources(items: list[dict], destination: Path) -> None:
                             raise IncompleteNotices(f"Empty calculated source archive: {filename}")
                 except tarfile.TarError as error:
                     raise IncompleteNotices(f"Calculated source is not a readable archive: {filename}") from error
+            verify_source_members(temporary, item)
             temporary.replace(path)
             item.update(sha256=actual, size=size)
         finally:
             temporary.unlink(missing_ok=True)
 
     (destination / "source-manifest.json").write_text(json.dumps(items, indent=2) + "\n", encoding="utf-8")
+
+
+def verify_source_members(path: Path, item: dict) -> None:
+    """Official MuPDF tar must contain real source, including every submodule."""
+    required = set(item.get("required_member_suffixes", ()))
+    if not required: return
+    for name in required: safe_relative(name)
+    found = set()
+    try:
+        with tarfile.open(path, "r:*") as archive:
+            for member in archive:
+                pure = PurePosixPath(member.name)
+                if pure.is_absolute() or ".." in pure.parts: raise IncompleteNotices("Unsafe corresponding-source member")
+                if not member.isfile() or member.size < 1 or len(pure.parts) < 2: continue
+                suffix = PurePosixPath(*pure.parts[1:]).as_posix()
+                if suffix in required: found.add(suffix)
+        if found != required: raise IncompleteNotices(f"Corresponding-source archive is incomplete: {item['filename']}: {sorted(required-found)}")
+    except tarfile.TarError as error:
+        raise IncompleteNotices("Corresponding-source archive is unreadable: "+item["filename"]) from error
 
 
 def verify_bundle(bundle: Path, notices: Path) -> dict:
@@ -737,6 +794,7 @@ def main() -> int:
     # Never leave a stale success marker after a failed re-collection.
     (output / "manifest.json").unlink(missing_ok=True)
     lock = copy_locked_notices(output)
+    copy_v09_locked_notices(output)
     versions, _ = collect_distributions(output)
     collect_python(output, versions["Python"])
     collect_system_notices(output)

@@ -42,6 +42,9 @@ from .ui.welcome import WelcomeWorkspace
 from .ui.pdf_dialogs import CompressionDialog, FormDialog, PasswordDialog, size_text
 from .ui.theme import file_dialog_options, semantic_label, stylesheet, theme_controller
 from .ui.workspace_session import WorkspaceSession
+from .ui.document_tabs import DocumentTabs
+from .ui.workflow_tools import WorkflowTools
+from .ui.advanced_tools import AdvancedTools
 
 
 class Job(QThread):
@@ -66,7 +69,7 @@ class Job(QThread):
             self.task = None
 
 
-class MainWindow(WorkspaceSession, QMainWindow):
+class MainWindow(DocumentTabs, WorkflowTools, AdvancedTools, WorkspaceSession, QMainWindow):
     def __init__(self):
         super().__init__()
         self.theme = theme_controller()
@@ -91,6 +94,7 @@ class MainWindow(WorkspaceSession, QMainWindow):
         self.setAcceptDrops(True)
         self._build_ui()
         self._build_menu()
+        self._init_document_tabs()
         self.theme.changed.connect(self._theme_changed)
         self.theme.preference_changed.connect(self._sync_theme_actions)
         self.refresh()
@@ -125,6 +129,7 @@ class MainWindow(WorkspaceSession, QMainWindow):
     def _build_ui(self):
         central = QWidget()
         outer = QVBoxLayout(central); outer.setContentsMargins(22, 18, 22, 14); outer.setSpacing(14)
+        self._outer_layout = outer
         header = QHBoxLayout(); header.setSpacing(10)
         brand = QLabel(); brand.setObjectName("brandMark")
         brand.setPixmap(icon("document", "on_accent").pixmap(QSize(26, 26)))
@@ -145,6 +150,7 @@ class MainWindow(WorkspaceSession, QMainWindow):
         self.appearance_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         header.addWidget(self.appearance_button)
         outer.addLayout(header)
+        self._build_document_tabs(outer)
 
         toolbar = QFrame(); toolbar.setObjectName("toolbar")
         self.organize_toolbar = toolbar
@@ -312,6 +318,7 @@ class MainWindow(WorkspaceSession, QMainWindow):
         self.open_action = self._action(file_menu, "PDFs hinzufügen …", QKeySequence.StandardKey.Open, self.open_dialog, "add")
         self.images_action = self._action(file_menu, "Bilder zu PDF-Seiten …", None, self.import_images, "document")
         self.new_action = self._action(file_menu, "Neuer Arbeitsbereich", QKeySequence.StandardKey.New, self.new_workspace, "new")
+        self._build_document_tab_menu(file_menu)
         file_menu.addSeparator()
         self.open_project_action = self._action(file_menu, "Projekt öffnen …", "Ctrl+Alt+O", self.open_project, "document")
         self.save_project_action = self._action(file_menu, "Projekt speichern", QKeySequence.StandardKey.Save, self.save_project, "document")
@@ -391,6 +398,11 @@ class MainWindow(WorkspaceSession, QMainWindow):
         self.bookmarks_action = self._action(tools_menu, "Lesezeichen bearbeiten …", "Ctrl+Alt+B", self.edit_bookmarks, "list")
         self.crop_action = self._action(tools_menu, "Seiten zuschneiden …", None, lambda: self.edit_page_geometry(mode="crop"), "select")
         self.resize_pages_action = self._action(tools_menu, "Seitenformat ändern …", None, lambda: self.edit_page_geometry(mode="resize"), "document")
+        tools_menu.addSeparator()
+        workflow_menu = tools_menu.addMenu("Scans, Export und Stapelverarbeitung")
+        self._build_workflow_menu(workflow_menu)
+        advanced_menu = tools_menu.addMenu("Text, Schwärzung, Signaturen und Archivierung")
+        self._build_advanced_menu(advanced_menu)
         help_menu = self.menuBar().addMenu("&Hilfe")
         self.update_action = self._action(help_menu, "Programm aktualisieren …", None, self.update_program)
         self._action(help_menu, "Über PDF Workbench", None, self.about)
@@ -402,6 +414,8 @@ class MainWindow(WorkspaceSession, QMainWindow):
         document_tools.addAction(self.bookmarks_action); document_tools.addAction(self.crop_action); document_tools.addAction(self.resize_pages_action)
         document_tools.addAction(self.ocr_action)
         document_tools.addSeparator(); document_tools.addAction(self.compress_action); document_tools.addAction(self.protect_action)
+        document_tools.addMenu(workflow_menu)
+        document_tools.addMenu(advanced_menu)
         self.document_tools_menu = document_tools
         self.document_tools_button.setMenu(document_tools)
 
@@ -478,10 +492,14 @@ class MainWindow(WorkspaceSession, QMainWindow):
     def _update_title(self):
         name = f"{self._project_path.name} · " if self._project_path else ""
         self.setWindowTitle(f"{'* ' if self._is_dirty() else ''}{name}PDF Workbench")
+        self._sync_document_tabs()
 
     def update_controls(self):
         busy = self.job is not None or self._closing_requested
+        self._update_document_tab_controls(busy)
         selected, has_pages = bool(self.selected_ids()), bool(self.workspace.pages)
+        self.update_workflow_controls(busy or self.preview.selection_pending, has_pages)
+        self.update_advanced_controls(busy or self.preview.selection_pending, has_pages)
         for action in (self.open_project_action, self.save_project_action, self.save_project_as_action, self.protect_project_action, self.update_action): action.setEnabled(not busy)
         self.recovery_action.setEnabled(not busy and self._services_enabled)
         for action in (self.bookmarks_action, self.crop_action, self.resize_pages_action): action.setEnabled(has_pages and not busy and not self.preview.selection_pending)
@@ -767,6 +785,9 @@ class MainWindow(WorkspaceSession, QMainWindow):
         super().resizeEvent(event)
         if not hasattr(self, "source_summary"): return
         compact = self.width() < 1020
+        short = self.height() < 660
+        self._outer_layout.setSpacing(8 if short else 14)
+        self._outer_layout.setContentsMargins(*( (16, 12, 16, 10) if short else (22, 18, 22, 14) ))
         self.welcome_workspace.adapt(self.height())
         self.source_summary.setVisible(not compact)
         for button in (self.fit_page_button, self.fit_width_button, self.annotations_button):
@@ -786,7 +807,7 @@ class MainWindow(WorkspaceSession, QMainWindow):
 
     def job_cancelled(self, message):
         self.set_status(message, "warning")
-        if "verblieben:" in message or "Nicht vollständig bereinigt" in message:
+        if "verblieben:" in message or "Nicht vollständig bereinigt" in message or "erhalten" in message:
             self.show_error("Abgebrochen: Hinweise zu verbliebenen Dateien", message)
 
     def cancel_job(self):
@@ -1056,7 +1077,8 @@ class MainWindow(WorkspaceSession, QMainWindow):
         self.start_job(task, success)
 
     def confirm_discard(self, after_save=None):
-        return self._confirm_session_discard(after_save)
+        with self._suspend_autosave():
+            return self._confirm_session_discard(after_save)
 
     def new_workspace(self):
         if not self.job and self.confirm_discard(after_save=self.new_workspace):
@@ -1071,10 +1093,10 @@ class MainWindow(WorkspaceSession, QMainWindow):
         if self.job:
             self.cancel_job(); self.set_status("Bitte den laufenden Abbruch abwarten und anschließend schließen."); event.ignore()
         elif self.render_broker.is_closed and self.search_bar.is_closed and self._background_closed():
-            self._finish_session(); event.accept()
+            self._close_document_tab_stores(); self._finish_session(); event.accept()
         elif self._closing_requested:
             event.ignore()
-        elif self.confirm_discard(after_save=self.close):
+        elif self._confirm_all_document_tabs(after_save=self.close):
             self._closing_requested = True; self._stop_background_services(); self.update_controls(); self.render_broker.shutdown(); self.search_bar.shutdown(); event.ignore()
         else: event.ignore()
 
@@ -1096,14 +1118,18 @@ class MainWindow(WorkspaceSession, QMainWindow):
             "Komprimierung, Passwortschutz und PDF-Versionsvergleich.<br>"
             "Formulare gestalten und ausfüllen, Wasserzeichen und Seitennummern.<br>"
             "Projekte mit Undo-Historie, Autosave und Programmupdates.<br>"
+            "Dokument-Tabs, Stapelvorlagen, Scan-Aufbereitung und Bild-/Textexport.<br>"
+            "Inhaltsverzeichnis, interne Links, echte Schwärzung und Textkorrektur.<br>"
+            "Zertifikatssignaturen und mit veraPDF geprüfter PDF/A-2b-Export.<br>"
             "Suche, Bildimport und optionale lokale OCR mit Tesseract.<br><br>"
-            "GPL-3.0-or-later · PyQt6 / QtPdf · pypdf<br>"
+            "GPL-3.0-or-later · PyQt6 / QtPdf · pypdf · pyHanko<br>"
+            "PyMuPDF / MuPDF unter GNU AGPLv3; siehe Lizenzhinweise.<br>"
             "Liberation Sans · SIL Open Font License<br>"
             "Gezeichnete Unterschriften sind sichtbare Zeichnungen.<br>"
-            "Zuschneiden ist keine Schwärzung. XFA, Skripte und<br>"
-            "Zertifikatssignaturen sind nicht unterstützt. Sichere Lesezeichen<br>"
+            "Zuschneiden ist keine Schwärzung. XFA und Skripte<br>"
+            "werden nicht unterstützt. Sichere Lesezeichen<br>"
             "auf enthaltene Seiten werden übernommen; externe Aktionen,<br>"
-            "Tags und Anhänge nicht. PDF/A ist nicht garantiert.<br><br>"
+            "Tags und Anhänge nicht. Normale PDF-Exporte sind kein PDF/A.<br><br>"
             "Unabhängiges Projekt ohne Adobe-Programmcode.")
 
     def dragEnterEvent(self, event):
@@ -1136,7 +1162,7 @@ def main(argv=None):
         from .update_installer import mark_update_started
         QTimer.singleShot(0, lambda: mark_update_started(*args.update_started))
     window.enable_background_services(prompt_recovery=not args.pdfs)
-    if len(args.pdfs) == 1 and Path(args.pdfs[0]).suffix.lower() == ".pdfwb":
-        QTimer.singleShot(0, lambda: window.open_project(path=args.pdfs[0]))
+    if args.pdfs and all(Path(path).suffix.lower() == ".pdfwb" for path in args.pdfs):
+        QTimer.singleShot(0, lambda: window.restore_document_tabs(args.pdfs))
     elif args.pdfs: QTimer.singleShot(0, lambda: window.import_files(args.pdfs))
     return app.exec()
