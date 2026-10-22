@@ -197,11 +197,11 @@
       "thirdparty/extract/src/alloc.c",
       "thirdparty/freeglut/progs/demos/CallbackMaker/CallbackMaker.c",
       "thirdparty/freetype/builds/amiga/src/base/ftdebug.c",
-      "thirdparty/gumbo-parser/benchmarks/benchmark.cc",
-      "thirdparty/harfbuzz/perf/benchmark-font.cc",
+      "thirdparty/gumbo-parser/src/parser.c",
+      "thirdparty/harfbuzz/src/hb-blob.cc",
       "thirdparty/jbig2dec/getopt.c",
-      "thirdparty/lcms2/plugins/fast_float/src/fast_16_tethra.c",
-      "thirdparty/leptonica/prog/adaptmap_dark.c",
+      "thirdparty/lcms2/src/cmspcs.c",
+      "thirdparty/leptonica/src/adaptmap.c",
       "thirdparty/libjpeg/cdjpeg.c",
       "thirdparty/mujs/jsarray.c",
       "thirdparty/openjpeg/src/lib/openjp2/bench_dwt.c",
@@ -209,7 +209,48 @@
       "thirdparty/zint/backend/2of5.c",
       "thirdparty/zlib/adler32.c",
       "thirdparty/zxing-cpp/core/src/Barcode.cpp"
-    ]
+    ],
+    "required_member_provenance": {
+      "thirdparty/gumbo-parser/src/parser.c": {
+        "commit": "61bd4e736c3b342e592f65be0d65ec6a0acd8dcb",
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-gumbo-parser/61bd4e736c3b342e592f65be0d65ec6a0acd8dcb/src/parser.c",
+        "size": 176224,
+        "sha256": "57a373ff59e067bf960fd29ecd672df7f6d3e6c77cd222e27ccd93371a0f955a",
+        "git_blob_sha1": "8b611280d090bef7a73b54e464921928866a80cf"
+      },
+      "thirdparty/harfbuzz/src/hb-blob.cc": {
+        "commit": "c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb",
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-harfbuzz/c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb/src/hb-blob.cc",
+        "size": 20476,
+        "sha256": "4293a719d5d4efd833b08064a2a6214acd246ff87f7b0bc9e2c2baadfe43d6ae",
+        "git_blob_sha1": "c363636d643918f6f6f86d09c5c83998daa729ef"
+      },
+      "thirdparty/lcms2/src/cmspcs.c": {
+        "commit": "d69c64417c4a33a4629957fc0e08f4f4c5abcc3d",
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/src/cmspcs.c",
+        "size": 26903,
+        "sha256": "73029d2ebeebbe294fd26d1d852c8c3d596a96e44c4a7655297ba41e53de888a",
+        "git_blob_sha1": "aeb5cef45eb25f35a8929ae7e0c9cfa4bd553ee9"
+      },
+      "thirdparty/leptonica/src/adaptmap.c": {
+        "commit": "7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c",
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-leptonica/7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c/src/adaptmap.c",
+        "size": 118640,
+        "sha256": "7738185494c78f9b3fd265ce83bff01da55ee8adedfe1726f4e83e57edf42f96",
+        "git_blob_sha1": "f4a67c5467091cb135936c3e0fe8d9ee8aa0900d"
+      }
+    },
+    "required_member_selection": {
+      "archive_recipe": {
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/scripts/archive.sh",
+        "sha256": "f5ded89920d1fa832cc2066c71c30d7b9fc9bbd3021086df439820d8031da565"
+      },
+      "build_list": {
+        "url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/Makelists",
+        "sha256": "1b81e5e2dbc2392a2e99fe12bd2cc7be43add197d91e1359f25857c597a90185"
+      },
+      "reason": "Release archive.sh intentionally removes gumbo benchmarks/tests, harfbuzz perf, lcms2 testbed/plugins/fast_float and leptonica prog. The four replacement members are actual library translation units explicitly listed in MuPDF 1.28.2 Makelists, pinned to their exact original submodule commits/blobs. All 18 submodules remain required; actual nonempty archive membership is checked by the source acquisition gate."
+    }
   },
   "files": [
     {

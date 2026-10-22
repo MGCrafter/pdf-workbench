@@ -166,5 +166,22 @@ class V09NoticesTests(unittest.TestCase):
         archive=self.archive({'COPYING':b'AGPL','source/fitz/document.c':b'C source','thirdparty/freetype/src/base/ftbase.c':b'real nested source'})
         notices.verify_source_members(archive,item)
 
+    def test_mupdf_release_requires_all_submodules_and_real_build_units_without_pruned_samples(self):
+        lock=json.loads(notices.V09_LOCK.read_text());item=lock['mupdf_source'];required=set(item['required_member_suffixes'])
+        units={'thirdparty/gumbo-parser/src/parser.c','thirdparty/harfbuzz/src/hb-blob.cc','thirdparty/lcms2/src/cmspcs.c','thirdparty/leptonica/src/adaptmap.c'}
+        self.assertEqual(len(required),21)
+        self.assertEqual({'/'.join(name.split('/')[:2]) for name in required if name.startswith('thirdparty/')},{entry['path'] for entry in lock['mupdf_submodules']})
+        self.assertTrue(units<=required)
+        self.assertFalse(any('/benchmarks/' in name or '/perf/' in name or '/plugins/fast_float/' in name or '/leptonica/prog/' in name for name in required))
+        self.assertEqual(set(item['required_member_provenance']),units)
+        commits={entry['path']:entry['commit'] for entry in lock['mupdf_submodules']}
+        for name,record in item['required_member_provenance'].items():
+            self.assertEqual(record['commit'],commits['/'.join(name.split('/')[:2])]);self.assertRegex(record['sha256'],r'^[0-9a-f]{64}$');self.assertRegex(record['git_blob_sha1'],r'^[0-9a-f]{40}$')
+        complete={name:b'nonempty library implementation' for name in required}
+        notices.verify_source_members(self.archive(complete),item)
+        for missing in units:
+            with self.subTest(missing=missing),self.assertRaisesRegex(notices.IncompleteNotices,'incomplete'):
+                notices.verify_source_members(self.archive({name:data for name,data in complete.items() if name!=missing}),item)
+
 
 if __name__=='__main__':unittest.main()
