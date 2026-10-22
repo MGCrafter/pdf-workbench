@@ -167,6 +167,18 @@ class UiRenderingTests(unittest.TestCase):
         self.assertEqual(messages, [detail])
         self.assertEqual(remaining.read_bytes(), b"existing remainder")
 
+    def test_cancelled_batch_shows_foreign_edit_paths_in_detail_dialog(self):
+        window = MainWindow(); self.windows.append(window)
+        remaining = self.root / "foreign-edited.pdf"; remaining.write_bytes(b"foreign edit")
+        detail = f"Stapelverarbeitung abgebrochen. Geänderte Dateien bleiben erhalten: {remaining}"
+        messages = []
+        window.show_error = lambda title, message: messages.append(message)
+        def task(cancel, progress): raise OperationCancelled(detail)
+        window.start_job(task, lambda result: self.fail("Cancelled job must not succeed"))
+        pump_until(lambda: window.job is None)
+        self.assertEqual(messages, [detail])
+        self.assertEqual(remaining.read_bytes(), b"foreign edit")
+
     def test_dialog_validation_rejects_existing_folder_and_bad_range(self):
         ranges = PageRangeDialog(None, 5)
         ranges.range_edit.setText("5, 1-3")

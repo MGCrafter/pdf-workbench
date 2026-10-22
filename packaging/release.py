@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build import verify_notices
 from collect_notices import verify_bundle
-from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS
+from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS, V09_CORE_CHECKS, V09_GUI_CHECKS, required_core_checks, required_gui_checks, minimum_core_tests
 
 
 def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, source_hashes: dict) -> dict:
@@ -66,6 +66,11 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
             raise ValueError('Complete native bookmarks/geometry/project/recovery/update PDF acceptance is required.')
         if not V08_GUI_CHECKS <= set(gui.get('checks', [])):
             raise ValueError('Complete native bookmarks/geometry/project/autosave/updater GUI acceptance is required.')
+    if tuple(int(part) for part in version.split('.')[:2]) >= (0, 9):
+        if core.get('tests', 0) < minimum_core_tests(version) or not required_core_checks(version) <= set(core.get('checks', [])):
+            raise ValueError('Complete native v0.9 workflow/content/signature/PDF-A acceptance is required.')
+        if not required_gui_checks(version) <= set(gui.get('checks', [])):
+            raise ValueError('Complete native v0.9 tabs/workflow/content/signature/validated-PDF-A GUI acceptance is required.')
     return report
 
 

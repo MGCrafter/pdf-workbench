@@ -12,6 +12,9 @@ Third-party components retain their own copyrights and licenses.
 | pypdf 6.10.0 | BSD-3-Clause | PDF import and export |
 | Pillow 12.3.0 | MIT-CMU, with bundled-library notices | Conservative PDF image recompression |
 | cryptography 50.0.1 | Apache-2.0 OR BSD-3-Clause, with bundled-library notices | AES-256 PDF encryption and decryption |
+| PyMuPDF / MuPDF 1.28.2 | GNU AGPL version 3 | Local PDF rendering, scan tools, text correction and content removal |
+| pyHanko 0.38.0 and pyhanko-certvalidator 0.33.0 | MIT | Offline certificate signing and signature verification |
+| tzdata | Apache-2.0 with public-domain IANA time-zone data | Offline time-zone support on Windows |
 | CFFI 2.1.1 and libffi | MIT-0 / original libffi MIT terms | Native cryptography binding runtime |
 | Rust libraries and OpenSSL embedded in cryptography | Original component licenses and exact SBOM/source records | Cryptography's native implementation |
 | Liberation Sans Regular 2.1.5 | SIL Open Font License 1.1 | Embedded font for editable text fields |
@@ -24,6 +27,21 @@ runtime dependencies and their original distribution notices must be retained.
 Other installed build tools
 appear in the distribution manifest; an installed tool is not necessarily
 part of the shipped application.
+
+Version 0.9 development adds PyMuPDF/MuPDF under its open-source GNU AGPLv3
+terms. No commercial Artifex licence is included or needed for this open-source
+development. The original PDF Workbench source remains GPL-3.0-or-later;
+redistribution of the combined application must also meet the applicable AGPLv3
+requirements. See section 13 of the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html)
+and [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html) and the
+[upstream licensing notice](https://pymupdf.readthedocs.io/en/latest/about.html).
+New runtime libraries and their native dependencies require corresponding-source
+and original-notice coverage before a new public binary release. The existing
+0.8 release manifests do not certify this 0.9 development runtime.
+
+Ghostscript and veraPDF are optional separately installed local programs for
+PDF/A conversion and validation; they are not bundled or downloaded by the app.
+Their own distributions carry their licences and dependencies.
 
 ## Complete texts
 

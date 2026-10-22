@@ -1,5 +1,11 @@
 # Public source and binary releases
 
+The 0.9 source development adds PyMuPDF/MuPDF, pyHanko and their runtime
+dependencies. Its local development builds are not public releases. The 0.8
+notice/source records do not cover these new dependencies; the native runtime
+provider and corresponding-source audits must be extended before publication.
+The existing release gates must remain strict for unknown native libraries.
+
 The public release is rebuilt on native Ubuntu 22.04 and Windows builders with
 Python 3.14.8 and exact versions in `packaging/requirements-release.txt`.
 Local CachyOS bundles and their historical license inventory are development

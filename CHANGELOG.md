@@ -1,5 +1,29 @@
 # Änderungen
 
+## 0.9.0 (Entwicklung, noch nicht veröffentlicht)
+
+- Getrennte Dokument-Tabs mit eigener Projektidentität, Undo-Historie,
+  geschützten automatischen Sicherungen und reversibler Seitenübertragung.
+- Stapelverarbeitung mit benannten/importierbaren Vorlagen für Komprimierung,
+  Drehung, Wasserzeichen, Seitennummern, Scan-Aufbereitung und lokale OCR.
+- Scans begradigen, Hintergrund bereinigen und Ausrichtung erkennen;
+  leere/doppelte Seiten vor einer manuellen Löschung prüfen.
+- Getrennte Vorder-/Rückseitenfolgen verschachteln, PNG/JPEG und UTF-8-Text
+  exportieren, klickbare Inhaltsverzeichnisse und interne Linkbereiche erzeugen.
+- Dauerhafte Schwärzung als vollständig neu aufgebaute Bild-PDF ohne
+  ursprüngliche Textschicht, Metadaten, Anhänge oder PDF-Revisionen.
+- Bestehende unterstützte PDF-Textabschnitte isoliert und rückgängig ersetzbar.
+- Eigene PFX/P12-Zertifikate zum kryptografischen Signieren neuer Exporte;
+  Offline-Prüfbericht trennt Integrität, spätere Änderungen und Zertifikatsvertrauen.
+- Lokale PDF/A-2b-Konvertierung mit Ghostscript; Speicherung erst nach echter
+  veraPDF-Validierung der tatsächlich ausgegebenen Daten.
+- Neue native Dialoge mit hellem/dunklem Theme, Tastaturbedienung und
+  sichtbaren Grenzen für Bildumwandlung, einfache Textkorrektur und Signaturen.
+- Original- und Fremddateischutz bei Stapelabbruch, stimmige Linkkoordinaten
+  bei Rotation/Beschnitt und getrennte Speicherentscheidungen vor einem Neustart.
+- Die öffentlichen Downloads bleiben 0.8.0. Neue Laufzeitkomponenten erfordern
+  vor Veröffentlichung erweiterte Lizenz-/Quellnachweise; macOS bleibt ungetestet.
+
 ## 0.8.0
 
 - Verschachtelte Lesezeichen importieren, gestalten und mit stabilen Arbeitsseitenzielen

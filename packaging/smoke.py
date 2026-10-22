@@ -660,6 +660,9 @@ def gui_acceptance(directory: Path):
         feature_checks += v07_acceptance(window, directory, app, wait_for, fixture)
         from v08_smoke import v08_acceptance
         feature_checks += v08_acceptance(window, directory, app, wait_for, fixture)
+        from v09_gui_review import v09_acceptance
+        feature_checks += v09_acceptance(window, directory, app, wait_for, fixture,
+            verapdf=os.environ.get("PDFWB_TEST_VERAPDF"), ghostscript=os.environ.get("PDFWB_TEST_GHOSTSCRIPT"))
         preview.fit_page(); app.processEvents()
         wait_for(lambda: not preview.image.isNull() and not preview._timer.isActive() and window.render_broker.pending_count == 0)
         screenshot = directory / "native-window.png"
@@ -699,9 +702,16 @@ def main():
             from v08_smoke import acceptance_class as v08_class
             acceptance = v08_class(v07_class(PdfAcceptance, fixture), fixture)
             acceptance.base = run
-            result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(acceptance))
+            from v09_review import Acceptance as V09Acceptance
+            V09Acceptance.base = run / "v09-core"
+            V09Acceptance.base.mkdir()
+            V09Acceptance.verapdf = os.environ.get("PDFWB_TEST_VERAPDF")
+            V09Acceptance.ghostscript = os.environ.get("PDFWB_TEST_GHOSTSCRIPT")
+            suite = unittest.TestSuite((unittest.defaultTestLoader.loadTestsFromTestCase(acceptance),
+                                       unittest.defaultTestLoader.loadTestsFromTestCase(V09Acceptance)))
+            result = unittest.TextTestRunner(verbosity=2).run(suite)
             report["core"] = {"tests": result.testsRun, "failures": len(result.failures), "errors": len(result.errors), "skipped": [(str(test), reason) for test, reason in result.skipped],
-                              "checks": unittest.defaultTestLoader.getTestCaseNames(acceptance)}
+                              "checks": unittest.defaultTestLoader.getTestCaseNames(acceptance) + unittest.defaultTestLoader.getTestCaseNames(V09Acceptance)}
             if not result.wasSuccessful(): raise AssertionError("PDF acceptance tests failed; see test.log")
             report["gui"] = gui_acceptance(run)
             report["result"] = "PASS"

@@ -82,6 +82,10 @@ QComboBox QAbstractItemView { background: %(surface)s; color: %(text)s; selectio
 QProgressBar { background: %(pressed)s; border: none; border-radius: 2px; }
 QProgressBar::chunk { background: %(accent)s; }
 QMenuBar, QMenu { background: %(surface)s; color: %(text)s; }
+QTabBar::tab { background: %(list)s; color: %(muted)s; border: 1px solid %(divider)s; border-radius: 5px; padding: 6px 12px; margin-right: 4px; min-width: 90px; }
+QTabBar::tab:selected { background: %(selected)s; color: %(text)s; border-color: %(selection_border)s; }
+QTabBar::tab:hover { background: %(hover)s; }
+QTabBar:focus { border: 2px solid %(focus)s; }
 QMenuBar::item:selected, QMenu::item:selected { background: %(selected)s; color: %(text)s; }
 QMenu::item { padding: 8px 25px 8px 10px; }
 QMenu::item:disabled { color: %(disabled)s; }

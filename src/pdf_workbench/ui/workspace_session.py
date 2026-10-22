@@ -121,13 +121,13 @@ class WorkspaceSession:
             if after_save: self._after_job_callback = after_save
         self.start_job(task, success)
 
-    def open_project(self, checked=False, *, path=None, recovery=False, password=None, incorrect=False, confirmed=False):
+    def open_project(self, checked=False, *, path=None, recovery=False, password=None, incorrect=False, confirmed=False, after_open=None):
         if self.job or self._closing_requested: return
         if path is None:
             filename, _ = QFileDialog.getOpenFileName(self, "Projekt öffnen", "", "PDF-Workbench-Projekt (*.pdfwb)", options=file_dialog_options())
             if not filename: return
             path = Path(filename)
-        if not confirmed and not self.confirm_discard(after_save=lambda: self.open_project(path=path, recovery=recovery, confirmed=True)): return
+        if not confirmed and not self.confirm_discard(after_save=lambda: self.open_project(path=path, recovery=recovery, confirmed=True, after_open=after_open)): return
         def task(cancel, progress):
             try: return read_project(path, password=password, cancel=cancel)
             except (ProjectPasswordRequired, IncorrectProjectPassword) as error: return error
@@ -135,7 +135,7 @@ class WorkspaceSession:
             if isinstance(loaded, (ProjectPasswordRequired, IncorrectProjectPassword)):
                 def retry():
                     value = ProjectPasswordDialog.ask(self, filename=Path(path).name, incorrect=isinstance(loaded, IncorrectProjectPassword))
-                    if value is not None: self.open_project(path=path, recovery=recovery, password=value, confirmed=True)
+                    if value is not None: self.open_project(path=path, recovery=recovery, password=value, confirmed=True, after_open=after_open)
                 self._after_job_callback = retry; return
             state = loaded.snapshot
             self.workspace.restore_state(state.state)
@@ -152,6 +152,7 @@ class WorkspaceSession:
             else: self.preview.set_zoom(state.zoom_factor)
             self.set_status("Automatische Sicherung wiederhergestellt. Bitte als neues Projekt speichern." if recovery else f"Projekt geöffnet: {loaded.path}")
             if loaded.recovered_from: self.set_status(f"Vorige Projektversion wiederhergestellt: {loaded.recovered_from}. Bitte erneut speichern.", "warning")
+            if after_open: self._after_job_callback = after_open
         self.start_job(task, success)
 
     def recover_project(self):

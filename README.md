@@ -7,6 +7,14 @@ lokal, ohne Konto und ohne Upload deiner Dokumente.
 **Version 0.8.0** ergänzt Lesezeichen, Zuschneiden und Seitenformate,
 speicherbare Projekte mit automatischer Sicherung sowie einen integrierten Updater.
 
+**Im Quellcode: Version 0.9.0, noch nicht veröffentlicht.** Neu sind getrennte
+Dokument-Tabs mit Seitenübertragung, Stapelvorlagen, Scan-Aufbereitung,
+Prüfung leerer/doppelter Seiten, Vorder-/Rückseiten-Sortierung, Bild-/Textexport,
+klickbare Inhaltsverzeichnisse und interne Links. Dazu kommen dauerhafte
+Schwärzung als neue Bild-PDF, begrenzte Bearbeitung bestehenden PDF-Texts,
+Offline-Zertifikatssignaturen und mit veraPDF validierter PDF/A-2b-Export.
+Bedienung und Grenzen stehen in [Ausbau 0.9](docs/v09-development.md).
+
 ## Download
 
 | System | Download für v0.8.0 |
@@ -138,8 +146,9 @@ sind sichtbare Zeichnungen, keine kryptografischen Zertifikatssignaturen.
 - Bildkomprimierung kann Details verlieren; spezielle Bildformate und Masken
   bleiben unverändert. Es gibt keine garantierte Größenersparnis.
 - Textmarkierungen brauchen eine vorhandene Textschicht. Die optionale OCR kann
-  sie für Scans ergänzen. Bestehender PDF-Text lässt sich nicht direkt ändern;
-  neue Textfelder sind eigene Objekte.
+  sie für Scans ergänzen. Ab 0.9 lassen sich unterstützte bestehende Textabschnitte
+  ersetzen; komplexe Schriften und Layouts werden abgewiesen. Neue Textfelder
+  bleiben eigene Objekte.
 - Sichere Lesezeichen auf enthaltene Seiten werden übernommen. Externe Aktionen,
   Skripte und genaue ursprüngliche Zoompositionen werden nicht kopiert. Anhänge,
   dokumentweite Metadaten und Tags werden nicht übernommen; PDF/A ist nicht garantiert.

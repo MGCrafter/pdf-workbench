@@ -629,7 +629,8 @@ def _layer_transform(page, layer):
 def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence[PageRef],
                           destination, *, engine: OcrEngine | None = None,
                           languages=("deu", "eng"), cache_dir=None, dpi=300, timeout=120,
-                          cancel: CancelCheck | None = None, progress: Progress | None = None, bookmarks=None) -> OcrResult:
+                          cancel: CancelCheck | None = None, progress: Progress | None = None, bookmarks=None,
+                          publication_record=None) -> OcrResult:
     target = Path(destination).expanduser().absolute()
     _protect_destination(target, sources); _check_cancel(cancel)
     if not pages or target.suffix.lower() != ".pdf":
@@ -696,7 +697,8 @@ def export_searchable_pdf(sources: Mapping[str, SourceDocument], pages: Sequence
                                     bookmarks=staged_bookmarks, bookmark_warnings=staged_warnings)
             final_pages = tuple(PageRef(f"ocr-{index}", staged.source_id, index) for index in range(len(pages)))
             result = export_pdf({**sources, staged.source_id: staged}, final_pages, target, cancel,
-                                lambda value, message: progress(85+value*15//100, message) if progress else None)
+                                lambda value, message: progress(85+value*15//100, message) if progress else None,
+                                publication_record=publication_record)
             return OcrResult(result, processed, skipped)
         finally:
             try:

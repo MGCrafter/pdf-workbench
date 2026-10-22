@@ -538,6 +538,7 @@ def export_pdf(
     optimization: CompressionOptions | None = None,
     compression_report: Callable[[CompressionReport], None] | None = None,
     bookmarks: Sequence[WorkspaceBookmark] | None = None,
+    publication_record: Callable | None = None,
 ) -> Path:
     """Write selected pages in their current order, safely creating a fresh PDF.
 
@@ -558,6 +559,20 @@ def export_pdf(
     try:
         writer = _build_writer(sources, pages, target.stem, cancel, progress,bookmarks=bookmarks)
         data, report = _serialize_output(writer, optimization, password, cancel, progress)
+        if publication_record is not None:
+            # Batch callers need the identity and expected immutable bytes
+            # before any public completion callback can change the stage file.
+            checked = PdfReader(io.BytesIO(data))
+            if password is not None and not checked.decrypt(password):
+                raise PdfWorkbenchError("Der Passwortschutz der gespeicherten PDF konnte nicht geprüft werden.")
+            if len(checked.pages) != len(pages):
+                raise PdfWorkbenchError("Die PDF konnte nicht vollständig gespeichert werden.")
+            from .workflows import publish_bytes
+            record = publish_bytes(data, target, sources, cancel)
+            publication_record(record)
+            if compression_report and report is not None: compression_report(report)
+            if progress: progress(100, "PDF gespeichert")
+            return target
         descriptor, name = tempfile.mkstemp(prefix=".pdf-workbench-", suffix=".tmp", dir=target.parent)
         temporary = Path(name)
         with os.fdopen(descriptor, "wb") as stream:

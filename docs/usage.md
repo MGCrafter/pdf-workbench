@@ -1,5 +1,8 @@
 # Bedienung
 
+Die neuen Werkzeuge und Dokument-Tabs des noch nicht veröffentlichten
+0.9-Quellcodes sind unter [Ausbau 0.9](v09-development.md) beschrieben.
+
 ## Projekte und automatische Sicherung
 
 **Datei → Projekt speichern** oder **Strg+S** sichert den ganzen Arbeitsbereich
