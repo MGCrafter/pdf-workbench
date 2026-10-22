@@ -57,7 +57,7 @@ def download(cache, url, expected):
     if target.exists():
         if not target.is_file() or target.is_symlink() or digest(target) != expected:
             raise ValueError(f"Cached acceptance tool checksum mismatch: {target.name}")
-        print(f"Verified cached {target.name}")
+        print(f"Verified cached {target.name}", flush=True)
         return target
     fd, name = tempfile.mkstemp(prefix=".download-", dir=cache)
     temporary = Path(name)
@@ -70,7 +70,7 @@ def download(cache, url, expected):
         os.replace(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)
-    print(f"Downloaded and verified {target.name}")
+    print(f"Downloaded and verified {target.name}", flush=True)
     return target
 
 
@@ -117,7 +117,13 @@ def prepare(cache, output):
         engine_root = output / "tesseract"
         gs_root = output / "ghostscript"
         run([download(cache, *TESSERACT), "/S", f"/D={engine_root}"])
-        run([download(cache, *GHOSTSCRIPT), "/S", f"/D={gs_root}"])
+        # Artifex's setup can wait for interactive UI even with /S. Its signed,
+        # pinned NSIS archive is also directly extractable, as used by the VM
+        # acceptance. Hosted Windows builders already contain 7-Zip.
+        sevenzip = shutil.which("7z") or str(Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "7-Zip/7z.exe")
+        if not Path(sevenzip).is_file():
+            raise ValueError("The Windows builder must provide 7-Zip for private Ghostscript extraction")
+        run([sevenzip, "x", "-y", f"-o{gs_root}", download(cache, *GHOSTSCRIPT)])
         engine = engine_root / "tesseract.exe"
         gs = gs_root / "bin/gswin64c.exe"
     else:

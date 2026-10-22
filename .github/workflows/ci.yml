@@ -17,6 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       PYTHONPATH: ${{ github.workspace }}/src
+      PIP_BUILD_CONSTRAINT: ${{ github.workspace }}/packaging/constraints-build.txt
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,10 +32,12 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends xvfb xauth poppler-utils ghostscript tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-osd libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 build-essential pkg-config libxml2-dev libxslt1-dev libffi-dev libjpeg-dev zlib1g-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev libwebp-dev libharfbuzz-dev libfribidi-dev libraqm-dev
+      - name: Use the tested source-build frontend
+        run: python -m pip install --upgrade pip==26.2.1
       - uses: ./.github/actions/acceptance-tools
       - name: Install Linux runtime with system image libraries
         if: runner.os == 'Linux'
-        run: python -m pip install --no-binary=Pillow,cffi,lxml -r packaging/requirements-release.txt
+        run: python -m pip install --verbose --no-binary=Pillow,cffi,lxml -r packaging/requirements-release.txt
       - name: Install Windows runtime
         if: runner.os == 'Windows'
         run: python -m pip install -r packaging/requirements-release.txt
