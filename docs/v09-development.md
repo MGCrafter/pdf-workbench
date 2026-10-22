@@ -1,7 +1,7 @@
-# Version 0.9: lokaler Entwicklungsstand
+# Version 0.9: Funktionen und Grenzen
 
-Diese Erweiterung ist im Quellcode vorhanden. Die öffentlichen Downloads in der
-README bleiben Version 0.8.0; eine neue Veröffentlichung wurde nicht beauftragt.
+Die neuen Werkzeuge arbeiten lokal. Installation, native Pakete und Updates
+sind in der [README](../README.md) beschrieben.
 
 ## Dokument-Tabs
 
@@ -100,9 +100,8 @@ nicht heimlich heruntergeladen oder zusammen mit Dokumenten an Cloud-Dienste
 geschickt. Die App arbeitet weiter lokal und ohne Konto.
 
 PyMuPDF/MuPDF wird unter GNU AGPLv3 eingesetzt. Die Lizenzhinweise beschreiben
-die Bedingungen des kombinierten freien Programms. Vor einer öffentlichen
-Binärveröffentlichung müssen die neuen nativen Laufzeitkomponenten mit ihren
-Originalhinweisen und passenden Quellen in die Release-Nachweise aufgenommen
-werden; die alten 0.8-Manifeste gelten dafür nicht.
+die Bedingungen des kombinierten freien Programms. Die Release-Nachweise
+verlangen die Originalhinweise und passenden Quellen der tatsächlich
+gebündelten nativen Laufzeitkomponenten; die alten 0.8-Manifeste genügen dafür nicht.
 
 macOS ist weiterhin nicht nativ getestet.

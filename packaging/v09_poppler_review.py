@@ -48,7 +48,7 @@ def main():
     for index, size, marker, greenpoint in ((1, (500, 300), (479, 21), (35, 265)), (2, (300, 500), (21, 21), (265, 465))):
         image = raster(path, index, 'selected-' + str(index)); assert image.size == size
         red(image, marker); green(image, greenpoint)
-        exported = Image.open(args.core / 'test_image_text_exports_follow_final_selection_and_rotation' / f'Seite-{index:04d}.png').convert('RGB')
+        exported = Image.open(source('test_image_text_exports_follow_final_selection_and_rotation', f'Seite-{index:04d}.png')).convert('RGB')
         assert exported.size == image.size
         red(exported, marker); green(exported, greenpoint)
     checks.append('Poppler selected A2,A1 page dimensions/rotation/color markers agree with PNG export')

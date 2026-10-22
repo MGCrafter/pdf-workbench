@@ -1,0 +1,1133 @@
+{
+  "schema_version": 1,
+  "pymupdf_version": "1.28.2",
+  "pymupdf_commit": "12786d12b2962a1d77fd13b103162eddf749644c",
+  "mupdf_version": "1.28.2",
+  "mupdf_git_tree": "fe374accd98a43174a328fa7980d7675e06d5b0d",
+  "mupdf_submodules": [
+    {
+      "path": "thirdparty/brotli",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-brotli",
+      "commit": "2523f3314501aa5c90e561922b2e668b3ccee26e",
+      "notice_paths": [
+        "LICENSE"
+      ]
+    },
+    {
+      "path": "thirdparty/cmark-gfm",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-cmark-gfm",
+      "commit": "74e0f5b6b62bbdd1e262c92f4bb2c6c871c6307e",
+      "notice_paths": [
+        "COPYING"
+      ]
+    },
+    {
+      "path": "thirdparty/curl",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-curl",
+      "commit": "f43c6fbb2dbdf68dfdd0f0c3399e3711a621614a",
+      "notice_paths": [
+        "COPYING",
+        "docs/LICENSE-MIXING.md",
+        "tests/python_dependencies/impacket/LICENSE"
+      ]
+    },
+    {
+      "path": "thirdparty/extract",
+      "repository": "https://github.com/ArtifexSoftware/extract",
+      "commit": "8750ac39c30a0d65119b426b5a491c5b8e8bf674",
+      "notice_paths": [
+        "COPYING"
+      ]
+    },
+    {
+      "path": "thirdparty/freeglut",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-freeglut",
+      "commit": "d5e2256d571b3ef66fb60716c99e35e9d3e570a2",
+      "notice_paths": [
+        "AUTHORS",
+        "COPYING"
+      ]
+    },
+    {
+      "path": "thirdparty/freetype",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-freetype2",
+      "commit": "0a0221a1347e2f1e07c395263540026e9a0aa7c7",
+      "notice_paths": [
+        "LICENSE.TXT",
+        "docs/FTL.TXT",
+        "docs/GPLv2.TXT"
+      ]
+    },
+    {
+      "path": "thirdparty/gumbo-parser",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-gumbo-parser",
+      "commit": "61bd4e736c3b342e592f65be0d65ec6a0acd8dcb",
+      "notice_paths": [
+        "COPYING"
+      ]
+    },
+    {
+      "path": "thirdparty/harfbuzz",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-harfbuzz",
+      "commit": "c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb",
+      "notice_paths": [
+        "AUTHORS",
+        "COPYING",
+        "src/ms-use/COPYING"
+      ]
+    },
+    {
+      "path": "thirdparty/jbig2dec",
+      "repository": "https://github.com/ArtifexSoftware/jbig2dec",
+      "commit": "dc15c39bbbddc90f79c14563d2eb5a794106be8f",
+      "notice_paths": [
+        "COPYING",
+        "LICENSE"
+      ]
+    },
+    {
+      "path": "thirdparty/lcms2",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-lcms2",
+      "commit": "d69c64417c4a33a4629957fc0e08f4f4c5abcc3d",
+      "notice_paths": [
+        "AUTHORS",
+        "LICENSE",
+        "plugins/fast_float/COPYING.GPL3",
+        "plugins/threaded/COPYING.GPL3",
+        "utils/jpgicc/LICENSE_iccjpeg"
+      ]
+    },
+    {
+      "path": "thirdparty/leptonica",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-leptonica",
+      "commit": "7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c",
+      "notice_paths": [
+        "leptonica-license.txt",
+        "prog/leptonica-license.txt",
+        "src/leptonica-license.txt"
+      ]
+    },
+    {
+      "path": "thirdparty/libjpeg",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-libjpeg",
+      "commit": "627faae398468d5d11e3d694dc325432f734b5c4",
+      "notice_paths": [
+        "README"
+      ]
+    },
+    {
+      "path": "thirdparty/mujs",
+      "repository": "https://github.com/ArtifexSoftware/mujs",
+      "commit": "e892c9fdbbddba94e52f656ccb378ed4885e30cc",
+      "notice_paths": [
+        "AUTHORS",
+        "COPYING",
+        "docs/license.html"
+      ]
+    },
+    {
+      "path": "thirdparty/openjpeg",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-openjpeg",
+      "commit": "957029eb875eee1118743f200cb86da9d8289de2",
+      "notice_paths": [
+        "AUTHORS.md",
+        "LICENSE"
+      ]
+    },
+    {
+      "path": "thirdparty/tesseract",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-tesseract",
+      "commit": "ad0f76d971946512a62c933f490c8111877eddaa",
+      "notice_paths": [
+        "AUTHORS",
+        "LICENSE"
+      ]
+    },
+    {
+      "path": "thirdparty/zint",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-zint",
+      "commit": "7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1",
+      "notice_paths": [
+        "LICENSE",
+        "backend_qt/COPYING",
+        "backend_tcl/licence.txt",
+        "debian/copyright",
+        "frontend/COPYING",
+        "frontend_qt/COPYING",
+        "frontend_qt/res/LICENSE_feathericons",
+        "frontend_qt/res/LICENSE_lucide"
+      ]
+    },
+    {
+      "path": "thirdparty/zlib",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-zlib",
+      "commit": "da607da739fa6047df13e66a2af6b8bec7c2a498",
+      "notice_paths": [
+        "LICENSE",
+        "contrib/dotzlib/LICENSE_1_0.txt",
+        "contrib/minizip/LICENSE.Info-Zip",
+        "README",
+        "zlib.h"
+      ]
+    },
+    {
+      "path": "thirdparty/zxing-cpp",
+      "repository": "https://github.com/ArtifexSoftware/thirdparty-zxing-cpp",
+      "commit": "742aef959e12a41eda494df78fd567c2e715ff57",
+      "notice_paths": [
+        "LICENSE"
+      ]
+    }
+  ],
+  "mupdf_source": {
+    "component": "MuPDF",
+    "version": "1.28.2",
+    "filename": "mupdf-1.28.2-source.tar.gz",
+    "url": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
+    "sha256": null,
+    "size": null,
+    "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+    "required_member_suffixes": [
+      "include/mupdf/fitz/version.h",
+      "source/fitz/document.c",
+      "COPYING",
+      "thirdparty/brotli/c/common/constants.c",
+      "thirdparty/cmark-gfm/CheckFileOffsetBits.c",
+      "thirdparty/curl/lib/altsvc.c",
+      "thirdparty/extract/src/alloc.c",
+      "thirdparty/freeglut/progs/demos/CallbackMaker/CallbackMaker.c",
+      "thirdparty/freetype/builds/amiga/src/base/ftdebug.c",
+      "thirdparty/gumbo-parser/benchmarks/benchmark.cc",
+      "thirdparty/harfbuzz/perf/benchmark-font.cc",
+      "thirdparty/jbig2dec/getopt.c",
+      "thirdparty/lcms2/plugins/fast_float/src/fast_16_tethra.c",
+      "thirdparty/leptonica/prog/adaptmap_dark.c",
+      "thirdparty/libjpeg/cdjpeg.c",
+      "thirdparty/mujs/jsarray.c",
+      "thirdparty/openjpeg/src/lib/openjp2/bench_dwt.c",
+      "thirdparty/tesseract/nsis/winpath.cpp",
+      "thirdparty/zint/backend/2of5.c",
+      "thirdparty/zlib/adler32.c",
+      "thirdparty/zxing-cpp/core/src/Barcode.cpp"
+    ]
+  },
+  "files": [
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libiconv/source/COPYING",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libiconv/880a1fa8b5581e37e136a7b051947d3ea39097b6/source/COPYING",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libiconv/source/COPYING.LIB",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libiconv/880a1fa8b5581e37e136a7b051947d3ea39097b6/source/COPYING.LIB",
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "size": 26530
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libiconv/source/libcharset/COPYING.LIB",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libiconv/880a1fa8b5581e37e136a7b051947d3ea39097b6/source/libcharset/COPYING.LIB",
+      "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551",
+      "size": 26530
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxml2/Copyright",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxml2/bb84678855e3407fc88180295c992f9c984e28e0/Copyright",
+      "sha256": "c5c63674f8a83c4d2e385d96d1c670a03cb871ba2927755467017317878574bd",
+      "size": 1289
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxslt/Copyright",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxslt/c0076eaa6e0d1f99e01107e8db225a308eb1e543/Copyright",
+      "sha256": "7e48e290b6bfccc2ec1b297023a1d77f2fd87417f71fbb9f50aabef40a851819",
+      "size": 2968
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxslt/tests/docbook/doc/copyright.html",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxslt/c0076eaa6e0d1f99e01107e8db225a308eb1e543/tests/docbook/doc/copyright.html",
+      "sha256": "2603fdfb55d284663aa262c04ec740d1f00ef7f4fec565170e18d78e8992e8a6",
+      "size": 1575
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxslt/tests/docbook/dtd/3.1.7/COPYRIGHT",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxslt/c0076eaa6e0d1f99e01107e8db225a308eb1e543/tests/docbook/dtd/3.1.7/COPYRIGHT",
+      "sha256": "0bee12b76c0229ef2098650db83ab88fc60f75f60230cb5fb49af96e58cfa59a",
+      "size": 1095
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxslt/tests/docbook/dtd/simple/3.1.7.1/COPYRIGHT",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxslt/c0076eaa6e0d1f99e01107e8db225a308eb1e543/tests/docbook/dtd/simple/3.1.7.1/COPYRIGHT",
+      "sha256": "66ea6d01c5eb87efbb48748157e1f440e4193a4333f92078431dbe0b8ba47564",
+      "size": 1151
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/libxslt/tests/docbook/dtd/simple/4.1.2.4/COPYRIGHT",
+      "source_url": "https://raw.githubusercontent.com/winlibs/libxslt/c0076eaa6e0d1f99e01107e8db225a308eb1e543/tests/docbook/dtd/simple/4.1.2.4/COPYRIGHT",
+      "sha256": "ccd62010471aeec715e14bbf5f33bf3d3ea090e5b5f57ebbbcfb61b13dbf91d6",
+      "size": 1073
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/lxml-wheels.yml",
+      "source_url": "https://raw.githubusercontent.com/lxml/lxml/lxml-6.1.3/.github/workflows/wheels.yml",
+      "sha256": "16e5ba2ae3588552205f47bc1f52a5c2e7c0805c9066faa79bdb3cd2f139c302",
+      "size": 8988
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/.github/workflows/main.yml",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/.github/workflows/main.yml",
+      "sha256": "2b6c35c1c46331869cff6a9db2a491568b45a556f69c3f6cc8b62a9b384f083c",
+      "size": 1516
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/.gitignore",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/.gitignore",
+      "sha256": "0e7582b3401085c6ac3c83652e0ee5d3a078b44242aa12edc73bb10b1fec37ca",
+      "size": 25
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/.gitmodules",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/.gitmodules",
+      "sha256": "1698b55aeacaabf7f09b9fd001debc29a1ee4fe0b486d11a2f20183f417b66d3",
+      "size": 318
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/README.md",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/README.md",
+      "sha256": "7c4d1efa1bfc917f0c754e323555952a462a458e3d395761ac377ffa8f38de19",
+      "size": 836
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/appveyor.yml",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/appveyor.yml",
+      "sha256": "90ce52c7af078dad0c14653aa982e11ca8a9fb4dc3adf410c9914d1b20e9d7cb",
+      "size": 1702
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/build.ps1",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/build.ps1",
+      "sha256": "bca4e9486154340e6ebd285dc4aac12835d212aba7cfb1766f6ef72b0d136e53",
+      "size": 4156
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/clean.ps1",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/clean.ps1",
+      "sha256": "315a2567075b1edc4cd3d0c0ad031d925c2b1a3f0e7ce51ed5af0f7ba184c195",
+      "size": 437
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/recipe/libiconv.patch",
+      "source_url": "https://raw.githubusercontent.com/lxml/libxml2-win-binaries/2026.05.17/libiconv.patch",
+      "sha256": "bcdef004ed4e1d2bf7569e2ba16236dd6b9e37b2658647626b9f7aba40a5b4bb",
+      "size": 2488
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/zlib/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/winlibs/zlib/0089522e62e6b5d4950e62bd20f0cb06a9288413/LICENSE",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "size": 1002
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/zlib/README",
+      "source_url": "https://raw.githubusercontent.com/winlibs/zlib/0089522e62e6b5d4950e62bd20f0cb06a9288413/README",
+      "sha256": "4026d921213bb2e311d8d42b44ef53361c102d5d45ae32f93f8e52eaee8d068f",
+      "size": 5291
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/zlib/contrib/dotzlib/LICENSE_1_0.txt",
+      "source_url": "https://raw.githubusercontent.com/winlibs/zlib/0089522e62e6b5d4950e62bd20f0cb06a9288413/contrib/dotzlib/LICENSE_1_0.txt",
+      "sha256": "36266a8fd073568394cb81cdb2b124f7fdae2c64c1a7ed09db34b4d22efa2951",
+      "size": 1359
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/zlib/contrib/minizip/LICENSE.Info-Zip",
+      "source_url": "https://raw.githubusercontent.com/winlibs/zlib/0089522e62e6b5d4950e62bd20f0cb06a9288413/contrib/minizip/LICENSE.Info-Zip",
+      "sha256": "fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca",
+      "size": 3509
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-windows-6.1.3/zlib/zlib.h",
+      "source_url": "https://raw.githubusercontent.com/winlibs/zlib/0089522e62e6b5d4950e62bd20f0cb06a9288413/zlib.h",
+      "sha256": "818667d6ab6a37fe7469cb06a7f0cb2c2cb2f2c948a03e5accf1a4a74bf3020a",
+      "size": 103848
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/COPYING",
+      "sha256": "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+      "size": 34520
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/docs/license.md",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/docs/license.md",
+      "sha256": "1412b5e5fb96eaff8676441921586b1fe3951358815ae1780568779cd5714740",
+      "size": 1254
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/fonts/droid/NOTICE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/fonts/droid/NOTICE",
+      "sha256": "38751245389e1e23f73e6f5384b5cbe7fa972cc4410c5adc9c04b082a0b9561a",
+      "size": 10695
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/fonts/han/LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/fonts/han/LICENSE.txt",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "size": 4301
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/fonts/noto/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/fonts/noto/COPYING",
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+      "size": 4301
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-af.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-af.info",
+      "sha256": "1957654979e56e9b77add085430b443bd3217cfa30943a1f293e05f9e88e2c3e",
+      "size": 2620
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-as.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-as.info",
+      "sha256": "feba53b46eff57eddf04d6cd0639bb59b56a5d6ae38b1e9b5d1c25a4063a8248",
+      "size": 2774
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-be.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-be.info",
+      "sha256": "58354164feabcef3efe156970712c0818a9c8ffee998c4562b6620fe80cd1612",
+      "size": 9239
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-bg.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-bg.info",
+      "sha256": "06c651f77ec4ce0d507a225b46c3e52fa1a275f6f65f4e3360e37678ea45e4f5",
+      "size": 44327
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-bn.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-bn.info",
+      "sha256": "75e30a3270421007219d277353b13a72c8f925a2b89f16ce5361d82f58ac8437",
+      "size": 2770
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ca.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ca.info",
+      "sha256": "4a2a2af321330525022c962bb16ab2e2c56512c37cc4f7e7e1467ce9be2822d9",
+      "size": 2619
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-cop.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-cop.info",
+      "sha256": "87891f2e290276a3614b35eb0642071eb34baab4046f56d974bc5841c00423cc",
+      "size": 6494
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-da.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-da.info",
+      "sha256": "57c58ab01b16cfde961fd45b3e466ad373e8b58504648ff8ff417a82b5ec6480",
+      "size": 2287
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-de-1996.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-de-1996.info",
+      "sha256": "aad8cc43d41f225e3770475c959f47594b54f780712931aa4f10090bce545d70",
+      "size": 2804
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-el-polyton.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-el-polyton.info",
+      "sha256": "eb429c009b4fbfa8568ef19ec05c9066c3264f814251105be88f6cc91c831e68",
+      "size": 3249
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-en-us.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-en-us.info",
+      "sha256": "3296b50a85819db4a81d0983a4197fa5139ef931365ea76a13529a7e762128d3",
+      "size": 2392
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-es.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-es.info",
+      "sha256": "844cb3e361c4b0d1bd61c31123eb8724753e28ddfe28523106ccd91ee02ad486",
+      "size": 2504
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-et.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-et.info",
+      "sha256": "644d6ea2cd5801b67a7d97e14dbd691915cd8e1f75486f9d79bf67b23050c7b0",
+      "size": 2501
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-fi.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-fi.info",
+      "sha256": "49e8d96053c4abd893f815424cc88fb812bbb71900c08c1fa6dcaa5281a3ee02",
+      "size": 2335
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-fr.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-fr.info",
+      "sha256": "d66c5b505f330f0f29c9a61c97d0cb5c5f3004d41a29a0435056854d28c18846",
+      "size": 7895
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-gu.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-gu.info",
+      "sha256": "5f87d3a0775a263579c2fecf5d006eacc664f3b0f3824a5e2f8de9942e2c0124",
+      "size": 2727
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-hi.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-hi.info",
+      "sha256": "d3452642fb44c3e6a5f5b788acd5a4333b560bf1250daa92c1bf7d7190d76dd0",
+      "size": 2715
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-hr.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-hr.info",
+      "sha256": "ccbc3fcd98d5d21a524f94d9bc705f64fded49782b76e9277f61f996874bbac1",
+      "size": 3102
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-hu.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-hu.info",
+      "sha256": "103b6a4611f931c3523afee980c81c49c1b3f905dd7bc2ef2df08142f9add0fd",
+      "size": 1173
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-hy.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-hy.info",
+      "sha256": "844484512560e53b6b646d901f832b5ec2597e61aada34760bb36b4054e915eb",
+      "size": 1373
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-is.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-is.info",
+      "sha256": "3771dad6b76cbc7f6fcc79ad751da3768ce566d74cf9fc39cd428e3f50318c3b",
+      "size": 1060
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-it.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-it.info",
+      "sha256": "7a3508434c511ad06fbddbd9463ea81f64ef916c33c6cd672dbbcc99f6d1f800",
+      "size": 3250
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ka.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ka.info",
+      "sha256": "097ebc0b6637546f2ac47dc16c45c08454d93fc10b7a02399a27972d4223228c",
+      "size": 1097
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-kn.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-kn.info",
+      "sha256": "c59f140fa0b885d6c6d9497948be4d26d801182f0cdc80d9a52c69ca64044a57",
+      "size": 2730
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-la.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-la.info",
+      "sha256": "801d8c49cb08d554d08e177f84579aec4211d25a3e4cc25902843ddcd1e4bedb",
+      "size": 7332
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-lt.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-lt.info",
+      "sha256": "6e82ec7a36bbe58965f33146a3cb7c37167a525f793938d7aaa5b081ed60aa37",
+      "size": 3170
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-lv.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-lv.info",
+      "sha256": "a5bfe75b2834d27db323d7a011497a168b89c54b90054d89cbb1232cd619172b",
+      "size": 1050
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ml.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ml.info",
+      "sha256": "6cec9aa039fbb55855dde2b3b8b47b11fa965903e78ca3af64b0edd941fbc1cb",
+      "size": 2728
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-mn-cyrl.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-mn-cyrl.info",
+      "sha256": "f2ad505f2669ba1716c236594b72c05538a9bcb30fb2265e129e8b0417c40779",
+      "size": 3125
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-mr.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-mr.info",
+      "sha256": "a09832fff4a5ec0e5ecd0fd858152e1bf2ef441ea3751ff9488d2c2f9b2618e7",
+      "size": 2739
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-nb.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-nb.info",
+      "sha256": "c5308d6b843ac9298ae7ff5f4c28d31ebb0ba8914184b9e18202b675147bbcf6",
+      "size": 1609
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-nl.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-nl.info",
+      "sha256": "f382780d756f13efdba0e913397afb91fddbb28534852381f7b97f93928c3a5c",
+      "size": 3656
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-or.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-or.info",
+      "sha256": "600541fd8ef59a882f949367b3f08f2a10312daa16d5be17bf4084c27cf50e82",
+      "size": 2708
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-pa.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-pa.info",
+      "sha256": "ba71ca37cda98f8fc85737cfa7eb691aa122fb3ba6fd7e40543076f57fae83ee",
+      "size": 2740
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-pi.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-pi.info",
+      "sha256": "15da529646346f296bf51a76bc76b86a78457f6a48990270c723c56224699619",
+      "size": 1990
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-pl.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-pl.info",
+      "sha256": "3927b7c9364589d501f2eebbf4421be4f2d8cd4df13fcdc616b6b6000fad88dc",
+      "size": 3547
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-pt.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-pt.info",
+      "sha256": "befb02719155c9339ec831c30f4ed68204585d34b5d985603456f9c38d336aee",
+      "size": 3276
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ro.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ro.info",
+      "sha256": "536a7ce30960fea3dfd7a4050ecb9564ca466e78acba75c2764a60d9d2d1372e",
+      "size": 1504
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ru.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ru.info",
+      "sha256": "392c96dd05aec7d935fc9db7e98c2e90eb0a78bc43c1087fcf651ccb18b8cac1",
+      "size": 1928
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-sa.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-sa.info",
+      "sha256": "a54cbc35c551d87169d5d6b3afa41806f3e3b8470dd9f0b0ccf11c16c3b8e6bf",
+      "size": 5005
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-sl.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-sl.info",
+      "sha256": "ab0a05c4fb61f3cf0a6c8829696e0c546ba4d07d0699312811af07db037f6db8",
+      "size": 3003
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-sq.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-sq.info",
+      "sha256": "2ff8550b54610755551add105cdf1eb2b92453fdda9e12f6ba7ce96db12edd4f",
+      "size": 2446
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-sv.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-sv.info",
+      "sha256": "f0db446c81d348e691457239b0250b521ab230aa80abd7b54066783e93ac7fe9",
+      "size": 2294
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-ta.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-ta.info",
+      "sha256": "dcf9da99c1927600297de580c6dbf9c9d707c83cd946509fea720e7ead916197",
+      "size": 2730
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-te.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-te.info",
+      "sha256": "32db1869dc90ea826d4b6a3c4ca1b1e5b5cc1bfa0967bbc74d64ac5611516e20",
+      "size": 2730
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-th.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-th.info",
+      "sha256": "dd2c5d1dc72327925ebaa901656cbb6badeaaee13f660e48096244fa81ce5eed",
+      "size": 32154
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-tk.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-tk.info",
+      "sha256": "34d483f8d40572b8bda5f6b4ff1aee82710ab72fb78d7d5fa43cf6c2133cf205",
+      "size": 2553
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/resources/hyphen/license/hyph-tr.info",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mupdf/1.28.2/resources/hyphen/license/hyph-tr.info",
+      "sha256": "c9091880f8ba90990f66877a0f40b270ba9d10b91f9bb03d45ebfd2548b1daf7",
+      "size": 2942
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/brotli/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-brotli/2523f3314501aa5c90e561922b2e668b3ccee26e/LICENSE",
+      "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94",
+      "size": 1084
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/cmark-gfm/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-cmark-gfm/74e0f5b6b62bbdd1e262c92f4bb2c6c871c6307e/COPYING",
+      "sha256": "c22e885f33b821bddb24cf007145e5540655b6c0f403e49e6c76a93c28e6d9a9",
+      "size": 7567
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/curl/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-curl/f43c6fbb2dbdf68dfdd0f0c3399e3711a621614a/COPYING",
+      "sha256": "8c8824f50e73a021f5dde1fccbf69685939247399a33a32abab1fa448c9ddabb",
+      "size": 1088
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/curl/docs/LICENSE-MIXING.md",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-curl/f43c6fbb2dbdf68dfdd0f0c3399e3711a621614a/docs/LICENSE-MIXING.md",
+      "sha256": "6f4bfc06c8209f38bb7bd4a16820e94b5c05e9de4e8c14ec094f15dddfaed777",
+      "size": 4636
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/curl/tests/python_dependencies/impacket/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-curl/f43c6fbb2dbdf68dfdd0f0c3399e3711a621614a/tests/python_dependencies/impacket/LICENSE",
+      "sha256": "823de15ae4ae9a0c975a3ad129a5121b48162d0926b7921fe46c342aa85e29dd",
+      "size": 3585
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/extract/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/extract/8750ac39c30a0d65119b426b5a491c5b8e8bf674/COPYING",
+      "sha256": "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+      "size": 34520
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/freeglut/AUTHORS",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-freeglut/d5e2256d571b3ef66fb60716c99e35e9d3e570a2/AUTHORS",
+      "sha256": "766c8fe7c6d849a5aaed5b2f6b8f013849225596c723d004e12c3036935391a3",
+      "size": 1163
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/freeglut/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-freeglut/d5e2256d571b3ef66fb60716c99e35e9d3e570a2/COPYING",
+      "sha256": "b6593d5ec4c113a274abb85b10e8615895cb0ddb89f7912af5fe5aa8df38a275",
+      "size": 1439
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/freetype/LICENSE.TXT",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-freetype2/0a0221a1347e2f1e07c395263540026e9a0aa7c7/LICENSE.TXT",
+      "sha256": "bd36c8b474855fa294c2ec5c184544478ef3720aad37d65a6296a4f264fd2d3b",
+      "size": 2149
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/freetype/docs/FTL.TXT",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-freetype2/0a0221a1347e2f1e07c395263540026e9a0aa7c7/docs/FTL.TXT",
+      "sha256": "5a5ee54c5001bbad1cdc1a57cc3dd4c42199b2da09d39c7ee41fab002d02967f",
+      "size": 6743
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/freetype/docs/GPLv2.TXT",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-freetype2/0a0221a1347e2f1e07c395263540026e9a0aa7c7/docs/GPLv2.TXT",
+      "sha256": "c4120c6752c910c299e3bd9cb3a46ff262c268303ca2069b61f92f10a5656c18",
+      "size": 17994
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/gumbo-parser/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-gumbo-parser/61bd4e736c3b342e592f65be0d65ec6a0acd8dcb/COPYING",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "size": 11357
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/harfbuzz/AUTHORS",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-harfbuzz/c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb/AUTHORS",
+      "sha256": "19bfe8f5ed100636cd24ab0c90a3f71c21d8b02d9ba00719447a0faab364d49f",
+      "size": 201
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/harfbuzz/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-harfbuzz/c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "size": 1971
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/harfbuzz/src/ms-use/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-harfbuzz/c28ba35a1e6dc4b6b32e2b1d11fd2a408f6c86bb/src/ms-use/COPYING",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "size": 1141
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/jbig2dec/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/jbig2dec/dc15c39bbbddc90f79c14563d2eb5a794106be8f/COPYING",
+      "sha256": "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+      "size": 34520
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/jbig2dec/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/jbig2dec/dc15c39bbbddc90f79c14563d2eb5a794106be8f/LICENSE",
+      "sha256": "1bf5258afe453934484fd0cea97508b72301633a6a78b0ae8a9ee44ac78f26d9",
+      "size": 1170
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/lcms2/AUTHORS",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/AUTHORS",
+      "sha256": "4847d97cd41e980794939b1d2694bd8f67b92856ec80e95c2fcfc34066f0df93",
+      "size": 1010
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/lcms2/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/LICENSE",
+      "sha256": "74fe8934cee0e63e8368d4a6b3a703b603e753a62b75b75273572e98a57ebf75",
+      "size": 1075
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/lcms2/plugins/fast_float/COPYING.GPL3",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/plugins/fast_float/COPYING.GPL3",
+      "sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271",
+      "size": 35146
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/lcms2/plugins/threaded/COPYING.GPL3",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/plugins/threaded/COPYING.GPL3",
+      "sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271",
+      "size": 35146
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/lcms2/utils/jpgicc/LICENSE_iccjpeg",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-lcms2/d69c64417c4a33a4629957fc0e08f4f4c5abcc3d/utils/jpgicc/LICENSE_iccjpeg",
+      "sha256": "8baac37d14eed89b82ffcb041677dd701164eb5cc0f26e165fe47eb11afa0dca",
+      "size": 3234
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/leptonica/leptonica-license.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-leptonica/7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c/leptonica-license.txt",
+      "sha256": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806",
+      "size": 1521
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/leptonica/prog/leptonica-license.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-leptonica/7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c/prog/leptonica-license.txt",
+      "sha256": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806",
+      "size": 1521
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/leptonica/src/leptonica-license.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-leptonica/7fbe9ea76d1e0c48a02b2ed371d24f92c7bac40c/src/leptonica-license.txt",
+      "sha256": "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806",
+      "size": 1521
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/libjpeg/README",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-libjpeg/627faae398468d5d11e3d694dc325432f734b5c4/README",
+      "sha256": "913af09f785683accdf660b85dcf27fdd567d4ad649daa95cb8771b040db79d1",
+      "size": 18711
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/mujs/AUTHORS",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mujs/e892c9fdbbddba94e52f656ccb378ed4885e30cc/AUTHORS",
+      "sha256": "d24f0cf75bdfe4e003592fb3eabca1ee8db9698b162e241c081462461eb9369f",
+      "size": 42
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/mujs/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mujs/e892c9fdbbddba94e52f656ccb378ed4885e30cc/COPYING",
+      "sha256": "0ca9b4fbfbcab8ac7d32475890d866efc02f4cffb6b6da5c0e9a0615cc3d82fe",
+      "size": 759
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/mujs/docs/license.html",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/mujs/e892c9fdbbddba94e52f656ccb378ed4885e30cc/docs/license.html",
+      "sha256": "533d750392fdfa8a856732a479f9b267310b4fd31732b21695fa3663444dd344",
+      "size": 1400
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/openjpeg/AUTHORS.md",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-openjpeg/957029eb875eee1118743f200cb86da9d8289de2/AUTHORS.md",
+      "sha256": "cf22e984f9fbb9be7550e9a94120595ba8c4a7de0d63f47d3725f4b2e28a4387",
+      "size": 712
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/openjpeg/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-openjpeg/957029eb875eee1118743f200cb86da9d8289de2/LICENSE",
+      "sha256": "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6",
+      "size": 2112
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/tesseract/AUTHORS",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-tesseract/ad0f76d971946512a62c933f490c8111877eddaa/AUTHORS",
+      "sha256": "720862b7253993b348fe15f37ed6e0d4feb0fc8df8324284d75975d54dd29923",
+      "size": 787
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/tesseract/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-tesseract/ad0f76d971946512a62c933f490c8111877eddaa/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/LICENSE",
+      "sha256": "d69af7f2442fcde1c3372cbbb43907fa1f4b3a91ef3899be69dd3a726dc255a4",
+      "size": 909
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/backend_qt/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/backend_qt/COPYING",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/backend_tcl/licence.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/backend_tcl/licence.txt",
+      "sha256": "b1722b97c78ba93650e62ff02dac8bad2859eaf6d6965ce025510c8c0c508514",
+      "size": 728
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/debian/copyright",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/debian/copyright",
+      "sha256": "edec41dba6f270124ad3ba658dc2514bb1e1a9d8c637b7d676cde361114680eb",
+      "size": 1325
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/frontend/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/frontend/COPYING",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/frontend_qt/COPYING",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/frontend_qt/COPYING",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "size": 35147
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/frontend_qt/res/LICENSE_feathericons",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/frontend_qt/res/LICENSE_feathericons",
+      "sha256": "7b4fbc0fda4330e71c1c20706b69e69f2c5ea721fcf3791911188e268975b523",
+      "size": 1082
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zint/frontend_qt/res/LICENSE_lucide",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zint/7a9fdd6cd00cd5bfd0082705d934c13ef84f25e1/frontend_qt/res/LICENSE_lucide",
+      "sha256": "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc",
+      "size": 880
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zlib/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zlib/da607da739fa6047df13e66a2af6b8bec7c2a498/LICENSE",
+      "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "size": 1002
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zlib/README",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zlib/da607da739fa6047df13e66a2af6b8bec7c2a498/README",
+      "sha256": "4026d921213bb2e311d8d42b44ef53361c102d5d45ae32f93f8e52eaee8d068f",
+      "size": 5291
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zlib/contrib/dotzlib/LICENSE_1_0.txt",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zlib/da607da739fa6047df13e66a2af6b8bec7c2a498/contrib/dotzlib/LICENSE_1_0.txt",
+      "sha256": "36266a8fd073568394cb81cdb2b124f7fdae2c64c1a7ed09db34b4d22efa2951",
+      "size": 1359
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zlib/contrib/minizip/LICENSE.Info-Zip",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zlib/da607da739fa6047df13e66a2af6b8bec7c2a498/contrib/minizip/LICENSE.Info-Zip",
+      "sha256": "fc686023047ce5ce3a18a9b8a777156f0e475929d3de06bac279f3c025d2b2ca",
+      "size": 3509
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zlib/zlib.h",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zlib/da607da739fa6047df13e66a2af6b8bec7c2a498/zlib.h",
+      "sha256": "818667d6ab6a37fe7469cb06a7f0cb2c2cb2f2c948a03e5accf1a4a74bf3020a",
+      "size": 103848
+    },
+    {
+      "path": "licenses/upstream/v09/mupdf-1.28.2/thirdparty/zxing-cpp/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ArtifexSoftware/thirdparty-zxing-cpp/742aef959e12a41eda494df78fd567c2e715ff57/LICENSE",
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+      "size": 11358
+    },
+    {
+      "path": "licenses/upstream/v09/pymupdf-1.28.2/COPYING",
+      "source_url": "https://raw.githubusercontent.com/pymupdf/PyMuPDF/12786d12b2962a1d77fd13b103162eddf749644c/COPYING",
+      "sha256": "57c8ff33c9c0cfc3ef00e650a1cc910d7ee479a8bc509f6c9209a7c2a11399d6",
+      "size": 34520
+    },
+    {
+      "path": "licenses/upstream/v09/pymupdf-1.28.2/setup.py",
+      "source_url": "https://raw.githubusercontent.com/pymupdf/PyMuPDF/12786d12b2962a1d77fd13b103162eddf749644c/setup.py",
+      "sha256": "d623992d3a3575c190cebb23ad5e2ce0006207e3aedbcd898a236cdf61efbd6c",
+      "size": 47652
+    },
+    {
+      "path": "licenses/upstream/v09/lxml-6.1.3/buildlibxml.py",
+      "sha256": "be99cde194739f2676e415e7b457d1dc6b94c00c5d86cae60ead44fcf3ea4c00",
+      "size": 27132,
+      "url": "https://raw.githubusercontent.com/lxml/lxml/lxml-6.1.3/buildlibxml.py"
+    }
+  ],
+  "windows_lxml": {
+    "version": "6.1.3",
+    "build_recipe_tag": "2026.05.17",
+    "recipe_tree": "4e8ae01f61145dc823ce2ae1d79f06241b7b46de",
+    "libxml_compiled": [
+      2,
+      11,
+      9
+    ],
+    "libxslt_compiled": [
+      1,
+      1,
+      45
+    ],
+    "wheel": {
+      "filename": "lxml-6.1.3-cp314-cp314-win_amd64.whl",
+      "url": "https://files.pythonhosted.org/packages/0f/bc/5811cc73cac05e324e05ba9b0924e1a163a317a167ede8a9c748b11db30a/lxml-6.1.3-cp314-cp314-win_amd64.whl",
+      "digests": {
+        "blake2b_256": "0fbc5811cc73cac05e324e05ba9b0924e1a163a317a167ede8a9c748b11db30a",
+        "md5": "2346e744c13e4016836ee6fcd0c21028",
+        "sha256": "66299564c046bc7e0cc5de5106601eae907e9fa5904cd68a323380a8502f7861"
+      },
+      "size": 4073951,
+      "upload_time_iso_8601": "2026-09-02T14:50:26.348572Z"
+    },
+    "source_archives": [
+      {
+        "component": "Windows lxml native build recipe",
+        "version": "2026.05.17",
+        "filename": "lxml-windows-native-recipe-2026.05.17.tar.gz",
+        "url": "https://github.com/lxml/libxml2-win-binaries/archive/refs/tags/2026.05.17.tar.gz",
+        "sha256": null,
+        "size": null,
+        "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+        "required_member_suffixes": [
+          "build.ps1",
+          "libiconv.patch",
+          ".gitmodules"
+        ]
+      },
+      {
+        "component": "Windows lxml bundled libiconv",
+        "version": "1.17.1",
+        "filename": "libiconv-1.17.1-880a1fa8b558.tar.gz",
+        "url": "https://github.com/winlibs/libiconv/archive/880a1fa8b5581e37e136a7b051947d3ea39097b6.tar.gz",
+        "sha256": null,
+        "size": null,
+        "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+        "git_commit": "880a1fa8b5581e37e136a7b051947d3ea39097b6",
+        "required_member_suffixes": [
+          "source/extras/iconv_string.c",
+          "source/COPYING"
+        ]
+      },
+      {
+        "component": "Windows lxml bundled libxml2",
+        "version": "2.11.9",
+        "filename": "libxml2-2.11.9-bb84678855e3.tar.gz",
+        "url": "https://github.com/winlibs/libxml2/archive/bb84678855e3407fc88180295c992f9c984e28e0.tar.gz",
+        "sha256": null,
+        "size": null,
+        "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+        "git_commit": "bb84678855e3407fc88180295c992f9c984e28e0",
+        "required_member_suffixes": [
+          "HTMLparser.c",
+          "Copyright"
+        ]
+      },
+      {
+        "component": "Windows lxml bundled libxslt",
+        "version": "1.1.45",
+        "filename": "libxslt-1.1.45-c0076eaa6e0d.tar.gz",
+        "url": "https://github.com/winlibs/libxslt/archive/c0076eaa6e0d1f99e01107e8db225a308eb1e543.tar.gz",
+        "sha256": null,
+        "size": null,
+        "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+        "git_commit": "c0076eaa6e0d1f99e01107e8db225a308eb1e543",
+        "required_member_suffixes": [
+          "doc/tutorial/libxslt_tutorial.c",
+          "Copyright"
+        ]
+      },
+      {
+        "component": "Windows lxml bundled zlib",
+        "version": "1.3.2",
+        "filename": "zlib-1.3.2-0089522e62e6.tar.gz",
+        "url": "https://github.com/winlibs/zlib/archive/0089522e62e6b5d4950e62bd20f0cb06a9288413.tar.gz",
+        "sha256": null,
+        "size": null,
+        "digest_source": "Calculated from pinned upstream HTTPS archive during cloud source acquisition",
+        "git_commit": "0089522e62e6b5d4950e62bd20f0cb06a9288413",
+        "required_member_suffixes": [
+          "adler32.c",
+          "LICENSE"
+        ]
+      }
+    ],
+    "submodules": [
+      {
+        "name": "libiconv",
+        "version": "1.17.1",
+        "repository": "https://github.com/winlibs/libiconv",
+        "commit": "880a1fa8b5581e37e136a7b051947d3ea39097b6"
+      },
+      {
+        "name": "libxml2",
+        "version": "2.11.9",
+        "repository": "https://github.com/winlibs/libxml2",
+        "commit": "bb84678855e3407fc88180295c992f9c984e28e0"
+      },
+      {
+        "name": "libxslt",
+        "version": "1.1.45",
+        "repository": "https://github.com/winlibs/libxslt",
+        "commit": "c0076eaa6e0d1f99e01107e8db225a308eb1e543"
+      },
+      {
+        "name": "zlib",
+        "version": "1.3.2",
+        "repository": "https://github.com/winlibs/zlib",
+        "commit": "0089522e62e6b5d4950e62bd20f0cb06a9288413"
+      }
+    ],
+    "provenance_note": "The official September wheel does not identify its static iconv version. Releases instead build lxml from its exact PyPI sdist with the four SHA-256/size-pinned official 2026.05.17 native assets; a deterministic local patch disables latest-release selection. A RECORD-bound receipt must bind these actual inputs, helper/patch, source recipe and compiled native output hashes.",
+    "sdist": {
+      "filename": "lxml-6.1.3.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/23/ad/28ecd7cb894d172f3c9c80a075eeeb2017ac62e3632cee05a5f9493547eb/lxml-6.1.3.tar.gz",
+      "size": 4211198,
+      "sha256": "45222d94ddd511536f3b2f7d9deae3b2339b4ce0f075f1ca25703b07cad9dd21"
+    },
+    "native_assets": {
+      "iconv": {
+        "filename": "iconv-1.17.1.win64.zip",
+        "url": "https://github.com/lxml/libxml2-win-binaries/releases/download/2026.05.17/iconv-1.17.1.win64.zip",
+        "sha256": "090225898fc0b37fe1f0d3ecc3938c926de77cd7f8c3636a5c9712b61e7af849",
+        "size": 992481
+      },
+      "libxml2": {
+        "filename": "libxml2-2.11.9.win64.zip",
+        "url": "https://github.com/lxml/libxml2-win-binaries/releases/download/2026.05.17/libxml2-2.11.9.win64.zip",
+        "sha256": "ff23c75d4b3991042f9bbe7fd38ccc50616349a3c1b583c328d996be22e52b64",
+        "size": 3455109
+      },
+      "libxslt": {
+        "filename": "libxslt-1.1.45.win64.zip",
+        "url": "https://github.com/lxml/libxml2-win-binaries/releases/download/2026.05.17/libxslt-1.1.45.win64.zip",
+        "sha256": "e6fcfa1cf6719630e83c39a5448687db65084b0a375af366c9a857b62c3e4bf7",
+        "size": 461024
+      },
+      "zlib": {
+        "filename": "zlib-1.3.2.win64.zip",
+        "url": "https://github.com/lxml/libxml2-win-binaries/releases/download/2026.05.17/zlib-1.3.2.win64.zip",
+        "sha256": "e1c1bcaa1dea202057f96614565c5773ee9c9be7033b470f2b746ab8a9070f01",
+        "size": 206914
+      }
+    },
+    "build_script": {
+      "path": "licenses/upstream/v09/lxml-6.1.3/buildlibxml.py",
+      "sha256": "be99cde194739f2676e415e7b457d1dc6b94c00c5d86cae60ead44fcf3ea4c00"
+    }
+  }
+}

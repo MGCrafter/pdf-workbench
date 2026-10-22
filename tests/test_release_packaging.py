@@ -211,7 +211,17 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             report, _ = self.prepare(target, platform_name)
             report['core'].update(tests=34, checks=sorted(release.required_core_checks(self.version)))
             report['gui']['checks'] = sorted(release.required_gui_checks(self.version))
+            extras = [f'base native workflow {index}' for index in range(60 - len(report['gui']['checks']))]
+            report['gui']['checks'] += extras
             self.write_report(report); self.assertEqual(self.verify(target), report)
+            for repeated in (False, True):
+                invalid = copy.deepcopy(report)
+                invalid['gui']['checks'].remove(extras[-1])
+                if repeated:
+                    invalid['gui']['checks'].append(invalid['gui']['checks'][0])
+                self.write_report(invalid)
+                with self.subTest(target=target, incomplete_gui=True, repeated=repeated), self.assertRaises(ValueError):
+                    self.verify(target)
             for section, required in (('core', release.V09_CORE_CHECKS), ('gui', release.V09_GUI_CHECKS)):
                 for missing in required:
                     invalid = copy.deepcopy(report); invalid[section]['checks'].remove(missing)

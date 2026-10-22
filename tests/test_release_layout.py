@@ -192,6 +192,8 @@ class ReleaseLayoutTests(unittest.TestCase):
         for path in self.input.iterdir(): path.unlink()
         core = {'tests': 34, 'failures': 0, 'errors': 0, 'skipped': [], 'checks': sorted(checks.required_core_checks(self.tag))}
         gui = sorted(checks.required_gui_checks(self.tag)); executable_sha = 'b' * 64
+        extras = [f'base native workflow {index}' for index in range(60 - len(gui))]
+        gui += extras
         for target, platform_name in (('linux', 'wayland'), ('windows', 'windows')):
             provenance = {'app_version': '0.9.0', 'source_commit': self.commit, 'source_sha256': {'src/app.py': 'c' * 64}}
             info = dict(provenance, executable_sha256=executable_sha, acceptance={'core': core, 'gui_checks': gui, 'qt_platform': platform_name})
@@ -208,6 +210,10 @@ class ReleaseLayoutTests(unittest.TestCase):
                 report_name = f'PDFWorkbench-{self.tag}-{target}-acceptance.json'
                 info_name = f'PDFWorkbench-{self.tag}-{target}-BUILD-INFO.json'
                 cases = []
+                for repeated in (False, True):
+                    broken = json.loads(baseline[report_name]); broken['gui']['checks'].remove(extras[-1])
+                    if repeated: broken['gui']['checks'].append(broken['gui']['checks'][0])
+                    cases.append(broken)
                 for section, required in (('core', checks.V09_CORE_CHECKS), ('gui', checks.V09_GUI_CHECKS)):
                     for missing in required:
                         broken = json.loads(baseline[report_name]); broken[section]['checks'].remove(missing); cases.append(broken)

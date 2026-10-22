@@ -9,8 +9,10 @@ The installed RECORD must authenticate every approved native extension.
 from __future__ import annotations
 
 import base64
+import ast
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import importlib.util
 from importlib import metadata
 import io
 import json
@@ -21,7 +23,16 @@ import sys
 import tarfile
 import tomllib
 
-VERSIONS = {"Pillow": "12.3.0", "cryptography": "50.0.1", "cffi": "2.1.1", "pycparser": "3.0"}
+VERSIONS = {"Pillow": "12.3.0", "cryptography": "50.0.1", "cffi": "2.1.1", "pycparser": "3.0",
+            "PyMuPDF": "1.28.2", "aiohttp": "3.14.5", "frozenlist": "1.8.0", "multidict": "7.1.0",
+            "propcache": "0.5.4", "yarl": "1.25.1", "lxml": "6.1.3"}
+NATIVE_MODULES = {
+    "aiohttp": ("aiohttp/_http_parser", "aiohttp/_http_writer", "aiohttp/_websocket/mask", "aiohttp/_websocket/reader_c"),
+    "frozenlist": ("frozenlist/_frozenlist",), "multidict": ("multidict/_multidict", "multidict/_testcapi"),
+    "propcache": ("propcache/_helpers_c",), "yarl": ("yarl/_quoting_c",),
+    "lxml": ("lxml/_elementpath", "lxml/builder", "lxml/etree", "lxml/objectify", "lxml/sax", "lxml/html/_difflib", "lxml/html/diff"),
+    "PyMuPDF": ("pymupdf/_extra", "pymupdf/_mupdf"),
+}
 RUST_COMMIT = "88d9e12ae178fab0fb5cc050a94da85685d449ea"
 RUST_VERSION = "1.98.0"
 RUST_BACKTRACE_COMMIT = "d902726a1dcdc1e1c66f73d1162181b5423c645b"
@@ -102,7 +113,91 @@ def native_identity(name, relative):
         return bool(re.fullmatch(r"_rust(?:\.[A-Za-z0-9_-]+)*\.(?:so|pyd)", filename))
     if name == "cffi" and len(path.parts) == 1:
         return bool(re.fullmatch(r"_cffi_backend(?:\.[A-Za-z0-9_-]+)*\.(?:so|pyd)", filename))
+    if name == "PyMuPDF" and relative in ("pymupdf/libmupdf.so.28.2", "pymupdf/libmupdfcpp.so.28.2", "pymupdf/mupdfcpp64.dll"):
+        return True
+    if name in NATIVE_MODULES:
+        return any(re.fullmatch(re.escape(stem)+r"(?:\.[A-Za-z0-9_-]+)*\.(?:so|pyd)", relative)
+                   for stem in NATIVE_MODULES[name])
     return False
+
+
+def v09_lock():
+    path = Path(__file__).with_name("v09-notices-lock.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("schema_version") != 1 or data.get("pymupdf_version") != VERSIONS["PyMuPDF"] or data.get("mupdf_version") != "1.28.2":
+        raise RuntimeAuditError("Unsupported PyMuPDF/MuPDF attribution lock")
+    return data
+
+
+def windows_lxml_receipt_identity():
+    spec = importlib.util.spec_from_file_location("pdfwb_lxml_builder", Path(__file__).with_name("build_lxml_windows.py"))
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    return helper.receipt_identity(helper.lock())
+
+
+def verify_windows_lxml_receipt(receipt, record):
+    expected = windows_lxml_receipt_identity()
+    if (not isinstance(receipt, dict) or any(receipt.get(key) != value for key, value in expected.items())
+            or receipt.get("build_inputs_verified") is not True
+            or receipt.get("native_files") != {item["relative_path"]: item["sha256"] for item in record["native_files"]}):
+        raise RuntimeAuditError("Windows lxml lacks its exact controlled-source-build receipt")
+    required = {stem+".cp314-win_amd64.pyd" for stem in NATIVE_MODULES["lxml"]}
+    if set(receipt["native_files"]) != required:
+        raise RuntimeAuditError("Windows lxml controlled build has an unexpected native file set")
+
+
+def audited_v09_sources(name, dist, record, output):
+    """Identify the real native build; never exempt a package directory."""
+    if name == "PyMuPDF":
+        lock = v09_lock()
+        entries = [entry for entry in dist.files or () if str(entry).replace("\\", "/") == "pymupdf/_build.py"]
+        if len(entries) != 1: raise RuntimeAuditError("PyMuPDF wheel has no exact build provenance")
+        _, data = _verified_file(dist, entries[0])
+        values = {}
+        for node in ast.parse(data).body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                values[node.targets[0].id] = ast.literal_eval(node.value)
+        if (values.get("pymupdf_version") != VERSIONS[name] or values.get("pymupdf_git_sha") != lock["pymupdf_commit"]
+                or values.get("mupdf_location") != lock["mupdf_source"]["url"] or values.get("pymupdf_git_diff") != ""):
+            raise RuntimeAuditError("PyMuPDF wheel build differs from its audited source recipe")
+        if sys.platform == "win32":
+            from PyQt6 import QtCore  # Load the portable MSVC runtime first.
+        import pymupdf
+        if pymupdf.VersionBind != VERSIONS[name] or pymupdf.VersionFitz != lock["mupdf_version"]:
+            raise RuntimeAuditError("Loaded MuPDF version differs from its source audit")
+        required = {"pymupdf/_extra.pyd", "pymupdf/_mupdf.pyd", "pymupdf/mupdfcpp64.dll"} if sys.platform == "win32" else {"pymupdf/_extra.so", "pymupdf/_mupdf.so", "pymupdf/libmupdf.so.28.2", "pymupdf/libmupdfcpp.so.28.2"}
+        if {item["relative_path"] for item in record["native_files"]} != required:
+            raise RuntimeAuditError("PyMuPDF wheel native component set differs from its source audit")
+        _put(output, "runtime/PyMuPDF-1.28.2/_build.py", data)
+        record["build_provenance"] = values
+        return [dict(lock["mupdf_source"])]
+    if name == "lxml":
+        from lxml import etree
+        record["libxml_compiled"] = list(etree.LIBXML_COMPILED_VERSION)
+        record["libxslt_compiled"] = list(etree.LIBXSLT_COMPILED_VERSION)
+        if sys.platform == "linux":
+            linked = subprocess.run(["readelf", "-d", etree.__file__], check=True, capture_output=True, text=True).stdout
+            if not all(re.search(r"\(NEEDED\).*\["+library+r"\.so\.[0-9.]+\]", linked) for library in ("libxml2", "libxslt")):
+                raise RuntimeAuditError("Linux release lxml must link audited system libxml2/libxslt; use --no-binary=lxml")
+            record["native_source_provider"] = "Source-built lxml; linked native libraries require exact Ubuntu dpkg sources"
+            return []
+        if sys.platform == "win32":
+            lock = v09_lock()["windows_lxml"]
+            if record["libxml_compiled"] != lock["libxml_compiled"] or record["libxslt_compiled"] != lock["libxslt_compiled"]:
+                raise RuntimeAuditError("Windows lxml native library versions differ from its audited recipe")
+            entries = [entry for entry in dist.files or () if str(entry).replace("\\", "/").endswith(".dist-info/pdf-workbench-native-build.json")]
+            if len(entries) != 1:
+                raise RuntimeAuditError("Windows lxml requires the controlled-source-build helper receipt")
+            _, receipt_data = _verified_file(dist, entries[0])
+            receipt = json.loads(receipt_data)
+            verify_windows_lxml_receipt(receipt, record)
+            record["native_build_receipt"] = receipt
+            _put(output, "runtime/lxml-6.1.3/pdf-workbench-native-build.json", receipt_data)
+            record["native_source_provider"] = lock
+            return [dict(item) for item in lock["source_archives"]]
+        raise RuntimeAuditError("This lxml native platform has not been audited")
+    return []
 
 
 def require_linux_cffi_system_library(path):
@@ -323,6 +418,8 @@ def collect_runtime_notices(output: Path, fetch) -> dict:
                 continue
             path, data = _verified_file(dist, entry)
             if native:
+                if name in NATIVE_MODULES and not native_identity(name, relative):
+                    raise RuntimeAuditError(f"Unknown native file in audited {name} wheel: {relative}")
                 if sys.platform == "linux" and name == "Pillow" and not native_identity(name, relative):
                     raise RuntimeAuditError("Linux release Pillow must be source-built; private wheel libraries are unaudited")
                 if sys.platform == "linux" and name == "cffi":
@@ -363,6 +460,7 @@ def collect_runtime_notices(output: Path, fetch) -> dict:
             sources.extend(windows_pillow_sources(pillow_sbom))
         own_source = _sdist(name, version, fetch)
         sources.append(own_source)
+        sources.extend(audited_v09_sources(name, dist, record, output))
         if name == "cffi":
             for relative, data in cffi_vendored_notices(own_source, fetch):
                 _put(output, f"runtime/cffi-{version}/libffi_x86_x64/" + relative, data)
@@ -404,6 +502,13 @@ def native_provider(source: Path, inventory: dict) -> dict | None:
                          for value in inventory.get("source_archives", [])}
             if source_id not in providers:
                 raise RuntimeAuditError("Runtime native input has no exact corresponding source record")
+            if name == "PyMuPDF" and ("mupdf", "1.28.2") not in providers:
+                raise RuntimeAuditError("MuPDF shared library has no complete matching source archive")
+            if name == "lxml" and inventory.get("platform") == "win32":
+                verify_windows_lxml_receipt(distribution.get("native_build_receipt"), distribution)
+                required = {(value["component"].casefold(), value["version"]) for value in v09_lock()["windows_lxml"]["source_archives"]}
+                if not required <= providers:
+                    raise RuntimeAuditError("Windows lxml native input lacks its corresponding sources")
             return {"path": str(source), "reason": f"RECORD-verified {name} {version} extension; runtime-wheels.json source archives",
                     "distribution": name, "version": version, "sha256": item["sha256"]}
     return None
@@ -424,8 +529,15 @@ def verify_frozen_runtime(bundle: Path, inventory: dict | None) -> list[dict]:
             name, relative = "cryptography", "/".join(parts[parts.index("cryptography"):])
         elif path.name.startswith("_cffi_backend"):
             name, relative = "cffi", path.name
+        elif "pymupdf" in parts:
+            name, relative = "PyMuPDF", "/".join(parts[parts.index("pymupdf"):])
+        elif path.name.startswith(("libmupdf", "mupdfcpp")):
+            name, relative = "PyMuPDF", "pymupdf/"+path.name
         else:
-            continue
+            matches = [(package, part) for package in NATIVE_MODULES if package != "PyMuPDF"
+                       for part in parts if part == package]
+            if not matches: continue
+            name, package = matches[0]; relative = "/".join(parts[parts.index(package):])
         basename = path.name.split(".")[0]
         if name == "Pillow" and basename == "_avif":
             raise RuntimeAuditError("Excluded AVIF extension was accidentally bundled")
@@ -440,6 +552,23 @@ def verify_frozen_runtime(bundle: Path, inventory: dict | None) -> list[dict]:
                       for item in dist.get("native_files", []) if item["relative_path"] == relative]
         if len(candidates) != 1 or _digest(path.read_bytes()) != candidates[0]["sha256"]:
             raise RuntimeAuditError(f"Bundled runtime extension differs from its audited RECORD: {relative}")
+        if name in NATIVE_MODULES:
+            source_ids = {(item.get("component", "").casefold(), item.get("version")) for item in inventory.get("source_archives", ())}
+            if (name.casefold(), VERSIONS[name]) not in source_ids:
+                raise RuntimeAuditError("New bundled native extension lacks its exact corresponding source record")
+        if name == "PyMuPDF":
+            providers = {(item.get("component", "").casefold(), item.get("version")) for item in inventory.get("source_archives", ())}
+            if not {("pymupdf", VERSIONS[name]), ("mupdf", "1.28.2")} <= providers:
+                raise RuntimeAuditError("Bundled MuPDF requires both matching PyMuPDF and complete MuPDF source records")
+        if name == "lxml" and inventory.get("platform") == "win32":
+            distributions = [dist for dist in inventory.get("distributions", ()) if dist.get("name") == name and dist.get("version") == VERSIONS[name]]
+            if len(distributions) != 1:
+                raise RuntimeAuditError("Bundled Windows lxml has ambiguous build provenance")
+            verify_windows_lxml_receipt(distributions[0].get("native_build_receipt"), distributions[0])
+            required = {(item["component"], item["version"]) for item in v09_lock()["windows_lxml"]["source_archives"]}
+            provided = {(item.get("component"), item.get("version")) for item in inventory.get("source_archives", ())}
+            if not required <= provided:
+                raise RuntimeAuditError("Bundled Windows lxml lacks its static-library corresponding sources")
         verified.append({"relative_path": relative, "distribution": name, "version": VERSIONS[name],
                          "sha256": candidates[0]["sha256"]})
     return verified

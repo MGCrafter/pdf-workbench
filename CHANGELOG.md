@@ -1,6 +1,6 @@
 # Änderungen
 
-## 0.9.0 (Entwicklung, noch nicht veröffentlicht)
+## 0.9.0
 
 - Getrennte Dokument-Tabs mit eigener Projektidentität, Undo-Historie,
   geschützten automatischen Sicherungen und reversibler Seitenübertragung.
@@ -21,8 +21,8 @@
   sichtbaren Grenzen für Bildumwandlung, einfache Textkorrektur und Signaturen.
 - Original- und Fremddateischutz bei Stapelabbruch, stimmige Linkkoordinaten
   bei Rotation/Beschnitt und getrennte Speicherentscheidungen vor einem Neustart.
-- Die öffentlichen Downloads bleiben 0.8.0. Neue Laufzeitkomponenten erfordern
-  vor Veröffentlichung erweiterte Lizenz-/Quellnachweise; macOS bleibt ungetestet.
+- Native Release-Abnahme und Quellnachweise umfassen die neuen Laufzeitkomponenten
+  und tatsächliche PDF/A-Konvertierung; macOS bleibt ungetestet.
 
 ## 0.8.0
 

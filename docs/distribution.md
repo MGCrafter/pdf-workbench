@@ -1,10 +1,11 @@
 # Public source and binary releases
 
-The 0.9 source development adds PyMuPDF/MuPDF, pyHanko and their runtime
-dependencies. Its local development builds are not public releases. The 0.8
-notice/source records do not cover these new dependencies; the native runtime
-provider and corresponding-source audits must be extended before publication.
-The existing release gates must remain strict for unknown native libraries.
+Version 0.9 adds PyMuPDF/MuPDF, pyHanko and their runtime dependencies. Its
+release collector derives every required distribution from the exact release
+pins, excluding only the test-only ReportLab package removed before freezing.
+The 0.8 notice/source records do not cover these new dependencies. Unknown
+native siblings, missing source records and changed RECORD files fail the
+0.9 audit. A local development build is not a public release acceptance.
 
 The public release is rebuilt on native Ubuntu 22.04 and Windows builders with
 Python 3.14.8 and exact versions in `packaging/requirements-release.txt`.
@@ -21,13 +22,70 @@ Original Rust/CFFI/OpenSSL notices and complete matching sources supplement
 the original wheel notice corpus. The Windows Pillow codec audit is described
 in [runtime-v06-audit.md](runtime-v06-audit.md).
 
-Linux builds Pillow and CFFI from their pinned source distributions against
+Linux builds Pillow, CFFI and lxml from their pinned source distributions against
 Ubuntu development libraries. The collected system ELFs retain the existing
 exact dpkg source-package audit. Only explicitly identified, hash-matching
 native extensions receive a corresponding Python-package source provider;
 unknown sibling libraries still fail. The unused AVIF plugin/native extension
 is excluded from the bundle. Source archives are acquired and checked in the
 cloud, with verified downloads cached for retries.
+
+## Version 0.9 native audit
+
+`packaging/v09-notices-lock.json` records official URLs, hashes and sizes for
+126 original notice/build files under `licenses/upstream/v09`. It includes
+the full AGPL texts, all 18 exact MuPDF third-party gitlinks and their original
+notices, additional font/hyphenation notices, and the Windows lxml recipes.
+This corpus is kept separately from the existing Qt/PDFium notice lock.
+
+The PyMuPDF provider authenticates its installed `_build.py` against RECORD,
+the exact PyMuPDF commit, empty upstream diff, MuPDF source URL, loaded binding
+and engine versions, and its exact native file set. PyMuPDF's PyPI source
+archive does not include the MuPDF tree. The source job therefore downloads
+the complete MuPDF 1.28.2 release source archive separately and checks actual
+implementation files in each of its 18 third-party submodules. An archive
+containing empty submodule directories fails. The archive's calculated HTTPS
+download digest is distinguished from an upstream-published digest.
+
+On Linux, lxml must link `libxml2.so` and `libxslt.so` dynamically. Their exact
+Ubuntu package/source audit supplies the corresponding native sources. An
+official lxml wheel containing private static copies fails this Linux gate.
+
+On Windows, the official lxml wheel does not establish the exact static iconv
+version. The release instead performs this controlled build before installing
+the remaining requirements:
+
+```powershell
+python packaging/build_lxml_windows.py --work-dir "$env:RUNNER_TEMP/pdfwb-lxml-build" --cache "$env:RUNNER_TOOL_CACHE/pdfwb-lxml-inputs"
+```
+
+Use the normal Python x64 environment with MSVC x64 Build Tools. The helper
+verifies the exact lxml 6.1.3 PyPI source archive and four official win64 ZIPs
+from `lxml/libxml2-win-binaries` release `2026.05.17`: iconv 1.17.1, libxml2
+2.11.9, libxslt 1.1.45 and zlib 1.3.2. Their published SHA-256 and sizes are in
+the lock. A deterministic patch replaces upstream's dynamic latest-release
+selection with these local inputs; it authenticates all extracted input bytes
+before use and records the build's actual invocation. Each retry uses a fresh
+build directory; only authenticated downloads are reused.
+
+The resulting `lxml-6.1.3.dist-info/pdf-workbench-native-build.json` is itself
+authenticated by RECORD. It binds the helper/patch, source archive, recipe,
+four native assets and all seven installed native extension hashes. The
+collector checks compiled XML/XSLT versions and requires this receipt; installed
+version strings alone are insufficient. The native provider and final frozen
+audit also require the complete corresponding sources of all four native
+libraries and the pinned parent build recipe. Those repositories' exact
+gitlink commits and nonempty implementation/notice members are recorded in the
+lock. The application source archive contains this helper and patch generator.
+Rebuilding with modified LGPL iconv inputs is permitted: change the source
+input lock to the modified assets, then rebuild lxml and the application. No
+signature or integrity restriction prevents the resulting library from loading.
+
+The aiohttp, frozenlist, multidict, propcache and yarl C extensions receive
+only exact module-specific RECORD providers with matching source distributions.
+No native package directory is generally exempted from the source audit.
+The full pyHanko dependency chain, including pure Python packages and time-zone
+data, has required original distribution notices and exact-version sources.
 
 The 0.6 package gate requires named password/compression/form PDF tests and
 GUI workflows, including reduced motion, from the actual frozen executable.
@@ -54,7 +112,9 @@ GitHub's per-asset limit. Its official SHA-256 is
 `6dcfbca271d76a6502741a2c0dc6fc98ef7dd0b7b4cfd0abcebb285a86a26f33`.
 The source job also collects exact-version PyQt6, SIP-runtime, pypdf,
 PyInstaller, hooks, Pillow, cryptography and CFFI source distributions, plus
-the matching bundled native/Rust dependencies. CPython sources are an additional
+the matching bundled native/Rust dependencies, the entire 0.9 signing dependency
+chain, complete MuPDF sources and Windows lxml's native sources/build recipes.
+CPython sources are an additional
 rebuild convenience; the PSF license does not require a source offer.
 
 The manifest distinguishes upstream-provided digests (Qt/PyPI) from CPython's
@@ -71,8 +131,8 @@ of the test-only ReportLab dependency (Pillow remains part of the runtime):
 python packaging/collect_notices.py --output build/release-notices
 ```
 
-It checks installed release versions, required distribution license files,
-the reviewed Qt notice corpus and hashes, all nine QtPdf attribution components,
+It checks every installed pinned release version, required distribution license files,
+the reviewed Qt and 0.9 notice corpora and hashes, all nine QtPdf attribution components,
 and the explicit PDFium/Foxit copyright. It collects CPython and OpenSSL notices
 matching the running interpreter. Linux requires the audited dpkg builder and
 includes native-package copyright texts and versions. Missing notices,

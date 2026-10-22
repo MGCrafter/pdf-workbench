@@ -111,3 +111,8 @@ def minimum_core_tests(version):
     current = _version_pair(version)
     return next(count for minimum, count in (
         ((0, 9), 34), ((0, 8), 23), ((0, 7), 18), ((0, 6), 15), ((0, 0), 13)) if current >= minimum)
+
+
+def minimum_gui_checks(version):
+    """Require the full native workflow coverage from the 0.9 release onward."""
+    return 60 if _version_pair(version) >= (0, 9) else 0

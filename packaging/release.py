@@ -15,9 +15,9 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build import verify_notices
+from build import verify_notices, release_distributions
 from collect_notices import verify_bundle
-from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS, V09_CORE_CHECKS, V09_GUI_CHECKS, required_core_checks, required_gui_checks, minimum_core_tests
+from release_checks import V06_CORE_CHECKS, V06_GUI_CHECKS, V07_CORE_CHECKS, V07_GUI_CHECKS, V08_CORE_CHECKS, V08_GUI_CHECKS, V09_CORE_CHECKS, V09_GUI_CHECKS, required_core_checks, required_gui_checks, minimum_core_tests, minimum_gui_checks
 
 
 def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, source_hashes: dict) -> dict:
@@ -69,7 +69,8 @@ def verify_acceptance(bundle: Path, results: Path, version: str, commit: str, so
     if tuple(int(part) for part in version.split('.')[:2]) >= (0, 9):
         if core.get('tests', 0) < minimum_core_tests(version) or not required_core_checks(version) <= set(core.get('checks', [])):
             raise ValueError('Complete native v0.9 workflow/content/signature/PDF-A acceptance is required.')
-        if not required_gui_checks(version) <= set(gui.get('checks', [])):
+        if (not required_gui_checks(version) <= set(gui.get('checks', []))
+                or len(set(gui.get('checks', []))) < minimum_gui_checks(version)):
             raise ValueError('Complete native v0.9 tabs/workflow/content/signature/validated-PDF-A GUI acceptance is required.')
     return report
 
@@ -102,8 +103,7 @@ def package(bundle: Path, notices: Path, output: Path, results: Path) -> Path:
                 'source_repository': 'https://github.com/MGCrafter/pdf-workbench',
                 'platform': target, 'architecture': 'x86_64',
                 'python': platform.python_version(), 'libc': platform.libc_ver(),
-                'packages': {name: importlib.metadata.version(name) for name in
-                             ('PyQt6', 'PyQt6-Qt6', 'PyQt6-sip', 'pypdf', 'PyInstaller', 'Pillow', 'cryptography', 'cffi')},
+                'packages': {name: importlib.metadata.version(name) for name in release_distributions()},
                 'source_sha256': source_hashes,
                 'executable_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
                 'acceptance': {'core': report['core'], 'gui_checks': report['gui']['checks'],

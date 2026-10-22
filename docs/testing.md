@@ -45,8 +45,8 @@ die konkrete interne Chronik steht in `docs/review.md`.
 
 Diese Ergebnisse betreffen lokale Entwicklungsprogramme. Der Linux-Build
 entsteht auf dem aktuellen Host und ist kein auf Ubuntu 22.04 geprüfter
-öffentlicher Release. Neue Laufzeitkomponenten benötigen vor Veröffentlichung
-erweiterte Lizenz-/Quellnachweise; die öffentlichen Downloads bleiben 0.8.0.
+öffentlicher Release. Öffentliche Pakete benötigen zusätzlich ihre eigene
+native Release-Abnahme und die erweiterten Lizenz-/Quellnachweise.
 macOS ist weiterhin ungetestet. Funktionen und Grenzen stehen unter
 [Ausbau 0.9](v09-development.md).
 

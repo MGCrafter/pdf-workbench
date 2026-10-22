@@ -116,7 +116,7 @@ def prepare(cache, output):
     if sys.platform == "win32":
         engine_root = output / "tesseract"
         gs_root = output / "ghostscript"
-        run([download(cache, *TESSERACT), "/S", f"/D={engine_root}"])
+        run([download(cache, *TESSERACT), "/S", "/AllUsers", f"/D={engine_root}"])
         # Artifex's setup can wait for interactive UI even with /S. Its signed,
         # pinned NSIS archive is also directly extractable, as used by the VM
         # acceptance. Hosted Windows builders already contain 7-Zip.
@@ -124,14 +124,27 @@ def prepare(cache, output):
         if not Path(sevenzip).is_file():
             raise ValueError("The Windows builder must provide 7-Zip for private Ghostscript extraction")
         run([sevenzip, "x", "-y", f"-o{gs_root}", download(cache, *GHOSTSCRIPT)])
-        engine = engine_root / "tesseract.exe"
+        # The upstream NSIS script may restore its standard installation path
+        # after processing /D. Accept only bounded known locations and verify
+        # that the result is the exact pinned build we just installed.
+        candidates = [engine_root / "tesseract.exe"]
+        for variable in ("ProgramFiles", "ProgramFiles(x86)"):
+            if os.environ.get(variable):
+                candidates.append(Path(os.environ[variable]) / "Tesseract-OCR/tesseract.exe")
+        if os.environ.get("LOCALAPPDATA"):
+            local = Path(os.environ["LOCALAPPDATA"])
+            candidates.extend((local / "Programs/Tesseract-OCR/tesseract.exe", local / "Tesseract-OCR/tesseract.exe"))
+        engine = next((path for path in candidates if path.is_file()), candidates[0])
         gs = gs_root / "bin/gswin64c.exe"
     else:
         engine = Path(shutil.which("tesseract") or "missing-tesseract")
         gs = Path(shutil.which("gs") or "missing-ghostscript")
     if not engine.is_file() or not gs.is_file():
-        raise ValueError("Native acceptance requires both real Tesseract and Ghostscript")
-    run([engine, "--version"])
+        raise ValueError(f"Native acceptance tools missing: Tesseract={engine} (exists={engine.is_file()}), Ghostscript={gs} (exists={gs.is_file()})")
+    version = run([engine, "--version"], capture_output=True, text=True)
+    print(version.stdout + version.stderr, flush=True)
+    if sys.platform == "win32" and not re.match(r"tesseract v?5\.4\.0\.20240606(?:\s|$)", version.stdout + version.stderr):
+        raise ValueError("The Windows OCR installation does not match the pinned acceptance build")
     run([gs, "--version"])
     listing = run([engine, "--list-langs"], capture_output=True, text=True).stdout
     match = re.search(r'List of available languages in "([^"]+)"', listing)
@@ -171,8 +184,11 @@ def main():
             if "\n" in value or "\r" in value:
                 raise ValueError("Unsafe acceptance environment value")
             stream.write(f"{key}={value}\n")
-    with Path(os.environ["GITHUB_PATH"]).open("a", encoding="utf-8") as stream:
-        stream.write(str(engine_path) + "\n")
+    # Prepending /usr/bin on Linux would replace setup-python's selected Python
+    # with Ubuntu's system interpreter for all following build/test commands.
+    if sys.platform == "win32":
+        with Path(os.environ["GITHUB_PATH"]).open("a", encoding="utf-8") as stream:
+            stream.write(str(engine_path) + "\n")
     (args.output / "tool-environment.json").write_text(json.dumps(environment, indent=2) + "\n", encoding="utf-8")
 
 

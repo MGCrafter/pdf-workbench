@@ -281,7 +281,7 @@ def prepare_assets(
     # require the complete feature report and its exact builder linkage here as
     # well, before uploading any archive. This never executes downloaded code.
     if tuple(map(int, tag[1:].split('.')[:2])) >= (0, 8):
-        from release_checks import required_core_checks, required_gui_checks, minimum_core_tests
+        from release_checks import required_core_checks, required_gui_checks, minimum_core_tests, minimum_gui_checks
         required_core = required_core_checks(tag)
         required_gui = required_gui_checks(tag)
         shared_source_hashes = None
@@ -308,6 +308,7 @@ def prepare_assets(
                     or core.get('failures') != 0 or core.get('errors') != 0 or core.get('skipped') != []
                     or not required_core <= set(core.get('checks', []))
                     or not required_gui <= set(gui.get('checks', []))
+                    or len(set(gui.get('checks', []))) < minimum_gui_checks(tag)
                     or accepted.get('core') != core or accepted.get('gui_checks') != gui.get('checks')
                     or accepted.get('qt_platform') != gui.get('qt_platform')
                     or provenance.get('source_commit') != source_commit

@@ -1,0 +1,21 @@
+name: Controlled Windows XML runtime
+description: Build lxml against hash-pinned native libraries with a RECORD-bound receipt
+runs:
+  using: composite
+  steps:
+    - name: Restore verified XML runtime sources
+      id: downloads
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ runner.tool_cache }}/pdfwb-lxml-downloads
+        key: lxml-native-v1-${{ runner.os }}-${{ hashFiles('packaging/build_lxml_windows.py', 'packaging/v09-notices-lock.json') }}
+        restore-keys: lxml-native-v1-${{ runner.os }}-
+    - name: Build the verified Windows XML runtime
+      shell: bash
+      run: python packaging/build_lxml_windows.py --work-dir "${{ runner.temp }}/pdfwb-lxml-build" --cache "${{ runner.tool_cache }}/pdfwb-lxml-downloads"
+    - name: Retain verified XML runtime downloads
+      if: always() && steps.downloads.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ runner.tool_cache }}/pdfwb-lxml-downloads
+        key: ${{ steps.downloads.outputs.cache-primary-key }}

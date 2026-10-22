@@ -2,7 +2,8 @@
 
 Stand: 22.10.2026, abschließender Lauf `final04`. Geprüfter Codecommit:
 `1c84ecc408c17aadb391b5b4c89d622f6e56e287`.
-Dies ist ein lokaler Entwicklungsbuild; Version 0.9 wurde nicht veröffentlicht.
+Dieser Bericht beschreibt einen lokalen Entwicklungsbuild. Die öffentliche
+Release-Abnahme wird getrennt auf den regulären Buildern durchgeführt.
 
 Die bestehende dedizierte Windows-11-Pro-VM (10.0.26200) wurde wiederverwendet.
 Die Prüfungen laufen als normaler Benutzer auf dem echten interaktiven Desktop

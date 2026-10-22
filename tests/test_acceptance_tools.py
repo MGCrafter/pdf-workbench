@@ -94,6 +94,29 @@ class AcceptanceToolsTests(unittest.TestCase):
         selected = [p.attrib["name"] for p in root.findall(".//pack") if p.attrib["selected"] == "true"]
         self.assertEqual(selected, ["veraPDF CLI"])
 
+    def test_linux_setup_does_not_prepend_system_bin_over_the_selected_python(self):
+        output = self.root / "prepared"; output.mkdir()
+        env_file, path_file = self.root / "github-env", self.root / "github-path"
+        environment = {"PDF_WORKBENCH_REQUIRE_OCR": "1", "PDF_WORKBENCH_REQUIRE_PDFA": "1"}
+        with patch.object(tools, "prepare", return_value=(environment, Path("/usr/bin"))), \
+                patch.object(tools.sys, "platform", "linux"), \
+                patch.object(tools.sys, "argv", ["acceptance_tools", "--cache", str(self.cache), "--output", str(output)]), \
+                patch.dict(tools.os.environ, {"GITHUB_ENV": str(env_file), "GITHUB_PATH": str(path_file)}):
+            tools.main()
+        self.assertFalse(path_file.exists(), "Prepending /usr/bin would shadow setup-python's interpreter")
+        self.assertIn("PDF_WORKBENCH_REQUIRE_PDFA=1", env_file.read_text())
+
+    def test_windows_setup_adds_only_the_prepared_ocr_directory(self):
+        output = self.root / "prepared"; output.mkdir()
+        env_file, path_file = self.root / "github-env", self.root / "github-path"
+        engine_path = output / "tesseract"
+        with patch.object(tools, "prepare", return_value=({"PDF_WORKBENCH_REQUIRE_OCR": "1"}, engine_path)), \
+                patch.object(tools.sys, "platform", "win32"), \
+                patch.object(tools.sys, "argv", ["acceptance_tools", "--cache", str(self.cache), "--output", str(output)]), \
+                patch.dict(tools.os.environ, {"GITHUB_ENV": str(env_file), "GITHUB_PATH": str(path_file)}):
+            tools.main()
+        self.assertEqual(path_file.read_text(), str(engine_path) + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()

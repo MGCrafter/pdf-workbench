@@ -14,6 +14,9 @@ Third-party components retain their own copyrights and licenses.
 | cryptography 50.0.1 | Apache-2.0 OR BSD-3-Clause, with bundled-library notices | AES-256 PDF encryption and decryption |
 | PyMuPDF / MuPDF 1.28.2 | GNU AGPL version 3 | Local PDF rendering, scan tools, text correction and content removal |
 | pyHanko 0.38.0 and pyhanko-certvalidator 0.33.0 | MIT | Offline certificate signing and signature verification |
+| lxml 6.1.3 | BSD-3-Clause, with original ElementTree/Python and native-library notices | Signature XML and certificate tooling dependency |
+| Windows lxml: libxml2 2.11.9, libxslt 1.1.45, zlib 1.3.2, libiconv 1.17.1 | Original MIT/zlib terms; libiconv LGPL-2.1-or-later and included GPL notices | Statically linked XML, XSLT, compression and encoding support |
+| asn1crypto, oscrypto, uritools, tzlocal, certifi, aiohttp, aiohappyeyeballs, aiosignal, attrs, frozenlist, multidict, propcache, yarl and idna | Their original BSD/MIT/Apache/Mozilla and included component terms | pyHanko's ASN.1, certificates, URI, time-zone and networking dependencies |
 | tzdata | Apache-2.0 with public-domain IANA time-zone data | Offline time-zone support on Windows |
 | CFFI 2.1.1 and libffi | MIT-0 / original libffi MIT terms | Native cryptography binding runtime |
 | Rust libraries and OpenSSL embedded in cryptography | Original component licenses and exact SBOM/source records | Cryptography's native implementation |
@@ -28,16 +31,19 @@ Other installed build tools
 appear in the distribution manifest; an installed tool is not necessarily
 part of the shipped application.
 
-Version 0.9 development adds PyMuPDF/MuPDF under its open-source GNU AGPLv3
+Version 0.9 adds PyMuPDF/MuPDF under its open-source GNU AGPLv3
 terms. No commercial Artifex licence is included or needed for this open-source
-development. The original PDF Workbench source remains GPL-3.0-or-later;
+distribution. The original PDF Workbench source remains GPL-3.0-or-later;
 redistribution of the combined application must also meet the applicable AGPLv3
 requirements. See section 13 of the [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html)
 and [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html) and the
 [upstream licensing notice](https://pymupdf.readthedocs.io/en/latest/about.html).
-New runtime libraries and their native dependencies require corresponding-source
-and original-notice coverage before a new public binary release. The existing
-0.8 release manifests do not certify this 0.9 development runtime.
+The 0.9 collector requires all release-pinned runtime/build distributions,
+their original notices and exact corresponding sources. The separate
+`packaging/v09-notices-lock.json` retains the full AGPL texts and original
+notices from every one of MuPDF's 18 pinned third-party submodules, bundled
+font/hyphenation notices, and the Windows lxml native build recipes. The
+existing 0.8 manifests are historical records and do not certify a 0.9 binary.
 
 Ghostscript and veraPDF are optional separately installed local programs for
 PDF/A conversion and validation; they are not bundled or downloaded by the app.
@@ -89,6 +95,16 @@ job verifies upstream Qt/PyPI checksums and records every download's size and
 SHA-256. Keep source archives available alongside the corresponding binaries;
 successful notice collection alone does not establish that source assets were
 uploaded. See [`docs/distribution.md`](docs/distribution.md).
+
+PyMuPDF's source distribution alone is insufficient: it downloads MuPDF during
+its build. The source set therefore also contains the complete MuPDF 1.28.2
+release archive; acquisition checks actual nonempty implementation files for
+all 18 third-party submodules. On Windows, lxml is rebuilt from its pinned
+source with four exact official native-library assets. Its authenticated build
+receipt binds the source, asset checksums, deterministic patch and installed
+native output. Complete native sources and the original build recipe accompany
+it. Users may rebuild these libraries, change the input lock to their modified
+builds, and relink/rebuild lxml; the application imposes no signature gate.
 
 The onedir build dynamically loads Qt libraries from ordinary extracted files.
 Users may replace them with compatible modified builds and rebuild the app.
