@@ -1,5 +1,55 @@
 # Tests
 
+## Lokale Entwicklung 0.9
+
+Der eingefrorene Quellstand `1c84ecc408c17aadb391b5b4c89d622f6e56e287`
+besteht unter Linux **540 Tests ohne Fehler oder Skips** (72,416 Sekunden).
+Das daraus tatsächlich gebaute Entwicklungsprogramm besteht nativ unter Wayland
+**34 PDF-Kerntests ohne Skips und 60 GUI-Nachweise**, einschließlich realer OCR,
+Zertifikatssignatur und tatsächlicher Ghostscript-/veraPDF-PDF/A-Konvertierung.
+Alle 62 eingebetteten App-/Font-/Lizenzhashes stimmen mit dem Gitbaum überein.
+Sieben zusätzliche unabhängige Poppler-Prüfungen bestätigen Reihenfolge,
+Rotation, Bildexport, echte Schwärzung, Textaustausch, Linkziele, PDF/A-Darstellung
+und kryptografische Signatur der tatsächlich aus dem gebauten Programm
+geschriebenen Dateien. Die Prüfung verwendet auch `pdftotext` und `pdfsig`.
+
+Unter Windows 11 bestehen **534 gemeldete Tests ohne Fehler**, mit 79 ausdrücklich
+ausgewiesenen Skips/Subfällen (88,039 Sekunden). Quellcode und fertig gebaute
+Windows-EXE bestehen nativ je 34 PDF-Fälle ohne Skips und 59 GUI-Nachweise.
+In dieser VM fehlt Tesseract; die bestehende OCR-GUI-Prüfung ist dort ausgenommen.
+Alle 15 neuen GUI-Abläufe einschließlich echter Zertifikatssignatur und
+Ghostscript-/veraPDF-PDF/A-Konvertierung bestehen. Die Windows-EXE enthält
+58 tatsächlich ausgelesene Appmodule und 62 Quell-/Font-/Lizenzrecords, die
+unabhängig mit demselben Gitbaum abgeglichen wurden. Das VM-Quellarchiv besitzt
+keine Git-Metadaten; die Bindung an den Commit beruht auf diesem externen
+Code-/Hashvergleich, nicht auf einem behaupteten eingebetteten Commitwert.
+Auch die tatsächlichen Windows-EXE-Exporte bestehen die sieben zusätzlichen
+Poppler-Prüfungen. Details und erwartete Ausnahmen stehen im
+[Windows-Bericht für 0.9](windows-v09-testing.md).
+
+Die neuen Regressionen prüfen getrennte Tab-Projekte und Passwörter,
+Wiederöffnung mehrerer Projekte, Undo nach Seitenübertragung, reine Historie,
+Sicherung in inaktiven Tabs und das Schließen während einer modalen
+Speicherabfrage. Manipulierte Zwischen-/Zieldateien werden erhalten und benannt;
+sie dürfen weder als eigene Ausgaben übernommen noch als erfolgreich geprüft
+gemeldet werden. PDF/A wird erst nach einem vollständigen veraPDF-Bericht für
+genau die ausgegebenen Daten gespeichert. Signaturtests trennen Integrität,
+Vertrauen und nicht bestätigten Sperrstatus.
+
+Weitere echte PDF-Fälle umfassen alle Drehungen mit CropBox/UserUnit,
+PDF-konforme indirekte interne Linkziele, maximal tiefe Lesezeichen und
+Schriftzeichengrenzen, Erhalt bearbeitbarer Objekte/Formularwerte beim
+Inhaltsverzeichnis sowie lokale OCR vor neuen Seitennummern. Unabhängige
+Review-Runden wurden vor und nach wesentlichen Korrekturen durchgeführt;
+die konkrete interne Chronik steht in `docs/review.md`.
+
+Diese Ergebnisse betreffen lokale Entwicklungsprogramme. Der Linux-Build
+entsteht auf dem aktuellen Host und ist kein auf Ubuntu 22.04 geprüfter
+öffentlicher Release. Neue Laufzeitkomponenten benötigen vor Veröffentlichung
+erweiterte Lizenz-/Quellnachweise; die öffentlichen Downloads bleiben 0.8.0.
+macOS ist weiterhin ungetestet. Funktionen und Grenzen stehen unter
+[Ausbau 0.9](v09-development.md).
+
 ## Lokale Abnahme 0.8
 
 Der Appstand `8778f12` besteht unter Linux **460 Tests ohne Fehler oder Skips**
