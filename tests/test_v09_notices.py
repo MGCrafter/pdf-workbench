@@ -66,7 +66,7 @@ class V09NoticesTests(unittest.TestCase):
 
     def test_mupdf_native_provider_requires_both_matching_sdists_and_record_hash(self):
         path=self.root/'libmupdf.so.28.2';path.write_bytes(b'recorded binary')
-        record={'name':'PyMuPDF','version':'1.28.2','native_files':[{'path':str(path),'relative_path':'pymupdf/libmupdf.so.28.2','sha256':hashlib.sha256(path.read_bytes()).hexdigest()}]}
+        record={'name':'PyMuPDF','version':'1.28.2','native_files':[{'path':str(path.resolve()),'relative_path':'pymupdf/libmupdf.so.28.2','sha256':hashlib.sha256(path.read_bytes()).hexdigest()}]}
         inventory={'schema_version':1,'platform':'linux','distributions':[record],'source_archives':[{'component':'PyMuPDF','version':'1.28.2'}]}
         with self.assertRaisesRegex(runtime.RuntimeAuditError,'complete matching'):runtime.native_provider(path,inventory)
         inventory['source_archives'].append({'component':'MuPDF','version':'1.28.2'})
